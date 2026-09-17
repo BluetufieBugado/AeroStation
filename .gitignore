@@ -1,0 +1,24 @@
+# Gradle / Android build outputs
+.gradle/
+build/
+app/build/
+captures/
+.externalNativeBuild/
+.cxx/
+
+# Local SDK / signing (nunca versionar)
+local.properties
+*.jks
+*.keystore
+
+# Android Studio
+.idea/
+*.iml
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Pacotes assinados
+*.apk
+*.aab

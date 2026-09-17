@@ -1,0 +1,12 @@
+* text=auto
+*.kts text
+*.kt text
+*.xml text
+*.properties text
+*.md text
+*.png binary
+*.jpg binary
+*.mp3 binary
+*.wav binary
+*.ogg binary
+*.rar binary

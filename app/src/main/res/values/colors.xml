@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Fundo do ícone adaptativo (AeroSkyMid da paleta do app). -->
+    <color name="ic_launcher_background">#2E86AB</color>
+</resources>
