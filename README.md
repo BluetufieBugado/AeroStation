@@ -48,6 +48,9 @@ O mesmo deve ser valido para o ArmSX3 que atualmente pode ser considerado o úni
 
 O Cemu Android também será adicionado futuramente, junto do suporte a SegaCD e Sega Saturn.
 
+## Capturas de Tela e Gravações
+
+O app reconhece suas capturas de tela e gravações no momento em que você abre um jogo, rastreando o tempo em que você sai e volta para o aplicativo, o único poblema dessse sistema é que caso você esteja jogando, pause o jogo no meio do processo e abra uma conversa ou outro aplicativo fazendo uma captura de tela, o AeroStation pode reconhecer aquela captura de tela como parte do jogo. Isso não é algo que seja possivel de contornar.
 
 ## Qual o intuito desse projeto a final?
 
