@@ -3,6 +3,7 @@
 <img src="icon-src/icon-full.png" alt="Banner" width="200">
 
 Um aplicativo que organiza suas ROMs com estética inspirada em Frutiger Aero e XMB com um toque de menu do Nintendo Switch.
+![apoie este projeto!](http://livepix.gg/bluetufiebugado)
 
 ## Estado atual do projeto
 
