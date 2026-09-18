@@ -1,5 +1,7 @@
 # AeroStation - FrontEnd
 
+<img src="icon-src/icon-full.png" alt="Banner" width="200">
+
 Um aplicativo que organiza suas ROMs com estética inspirada em Frutiger Aero e XMB com um toque de menu do Nintendo Switch.
 
 ## Estado atual do projeto
