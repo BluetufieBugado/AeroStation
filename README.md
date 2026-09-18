@@ -2,10 +2,6 @@
 
 Um aplicativo que organiza suas ROMs com estética inspirada em Frutiger Aero e XMB com um toque de menu do Nintendo Switch.
 
-# Qual é o objetivo desse app?
-
-A ideia é trazer algo mais próximo de um console para dispositivos Android comuns, não é algo pensado para o AynTor, ou qualquer outro console portátil que use Android. Mas se você quiser usar em um portátil Android não há problema, penso em adicionar no futuro uma opção que permita adicionar o app como home menu do seu dispositivo, para ajudar nesses casos, já que atualmente ele funciona como launcher de jogos.
-
 ## Estado atual do projeto
 
 Atualmente o projeto conta com funções avançadas como contador de horas com um marcador de ultima conquista desbloqueada, página dedicada de conquistas em jogos, página com carrocel de apps, possibilidade de navegar entre os jogos com controle fisico ou digital, adicionar jogos android e recompilações a tela inicial, galeria de capturas de tela e gravação de video, dentre outros.
@@ -49,6 +45,8 @@ O Cemu Android também será adicionado futuramente, junto do suporte a SegaCD e
 
 
 ## Qual o intuito desse projeto a final?
+
+A ideia é trazer algo mais próximo de um console para dispositivos Android comuns, não é algo pensado para o AynTor, ou qualquer outro console portátil que use Android. Mas se você quiser usar em um portátil Android não há problema, penso em adicionar no futuro uma opção que permita adicionar o app como home menu do seu dispositivo, para ajudar nesses casos, já que atualmente ele funciona como launcher de jogos.
 
 Honestamente, eu o fiz por diversão e aprendizado, mas também queria criar um app que pudesse trazer um sentimento de console mesmo sem a necessidade de um controle fisico. Apps como o IISU podem até entregar uma interface bonita mas a navegação com sensação de console depende muito de um controle fisico. No geral esse problema seria resolvido com um controle digital como adicionei no meu proprio app, mas acredito que cada aplicativo ou projeto tem sua propria filosofia e é isso que importa.
 
