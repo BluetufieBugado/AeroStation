@@ -20,11 +20,14 @@ Os emuladores suportados e testados incluem:
 | Sega Genesis| Retroarch |
 | Sega CD| Não testado (em breve) |
 | MasterSystem | Não testado (em breve) |
+| Sega Saturn | Não testado |
 | N64 | Retroarch|
 | NDS | Drastic, Watermelon e SeedlessDS|
 | 3DS | Citra MMJ (opção lowend) e Azahar |
 | Switch | Eden e Skyline Edge |
-| WiiU | Cemu Emulator (Ainda não testado/implementado) |
+| Gamecube | Dolphin e Dolphin MMJR2|
+| Wii | Dolphin e Dolphin MMJR2|
+| Wii U | Ainda não testado |
 | PSP | PPSSPP (O GOAT) |
 | PS1 | Duckstation |
 | PS2 | AetherSX2/NetherSX2 |
