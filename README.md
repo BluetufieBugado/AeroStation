@@ -4,7 +4,7 @@
 
 Um aplicativo que organiza suas ROMs com estética inspirada em Frutiger Aero e XMB com um toque de menu do Nintendo Switch.
 
-<a href="https://ko-fi.com/bluetufiebugado"><img width="32" src="https://github.com/user-attachments/assets/8d155ff1-ca71-4aa3-b0a0-6ce85435e8d6" alt="Texto Alternativo" align="left" style="margin-right: 10px;"></a> you can support this project here with ko-fi =)
+<a href="https://ko-fi.com/bluetufiebugado"><img width="32" src="https://github.com/user-attachments/assets/16ad17c9-2ff4-4d4a-a1f1-de0ecbcb91d0" alt="Texto Alternativo" align="left" style="margin-right: 10px;"></a> you can support this project here with ko-fi =)
 
 ## Utilização
 
