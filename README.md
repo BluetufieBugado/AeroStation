@@ -52,6 +52,7 @@ Toque e segure sobre um jogo e você verá várias opções de customização, i
 | Java ME | J2ME Loader |
 | Xbox Classico | Em Breve |
 | Xbox 360 e One | Em Breve |
+| PC (Windows) | Gamenative com ID do jogo, sem boot direto em apps como Winlator, Gamehub e etc |
 
 ## Temas!🎨
 
