@@ -18,12 +18,14 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -38,6 +40,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.res.stringResource
+import com.btbugado.aerostation.R
 import androidx.compose.ui.zIndex
 import coil.compose.AsyncImage
 import com.btbugado.aerostation.data.AndroidAppLauncher
@@ -53,6 +57,7 @@ import com.btbugado.aerostation.data.PlayTimeStore
 import com.btbugado.aerostation.data.RetroAchievementsStore
 import com.btbugado.aerostation.data.RomFolderStore
 import com.btbugado.aerostation.data.RomScanner
+import com.btbugado.aerostation.data.ScanCacheStore
 import com.btbugado.aerostation.data.withOverride
 import com.btbugado.aerostation.ui.components.CartridgeInsertOverlay
 import com.btbugado.aerostation.ui.components.CartridgePreviewDialog
@@ -103,9 +108,15 @@ fun PlayedScreen(
             isScanning = false
             return@LaunchedEffect
         }
-        isScanning = true
+        // Mesma tática da Home: disco na hora + rescan silencioso.
+        ScanCacheStore.loadDisk(context, uri)?.let { disk ->
+            LauncherContentCache.putGames(uri, disk)
+            games = disk
+            isScanning = false
+        } ?: run { isScanning = true }
         val scanned = RomScanner.scan(context, uri)
         LauncherContentCache.putGames(uri, scanned)
+        ScanCacheStore.saveDisk(context, uri, scanned)
         games = scanned
         isScanning = false
     }
@@ -157,23 +168,39 @@ fun PlayedScreen(
     }
 
     Box(modifier = Modifier.fillMaxSize()) {
+        // Header colapsável: no topo mostra título grande + subtítulo; ao
+        // rolar pra baixo o subtítulo some e o título encolhe — libera ~40dp
+        // de lista. Rolar de volta ao topo expande de novo.
+        val listState = rememberLazyListState()
+        val headerExpanded by remember {
+            derivedStateOf {
+                listState.firstVisibleItemIndex == 0 &&
+                    listState.firstVisibleItemScrollOffset < 120
+            }
+        }
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(top = 20.dp, bottom = contentPadding.calculateBottomPadding())
         ) {
             Text(
-                text = "Mais jogados",
+                text = stringResource(R.string.screens_most_played_title),
                 color = AeroTextPrimary,
-                fontSize = 26.sp,
-                modifier = Modifier.padding(start = 76.dp, bottom = 4.dp)
+                fontSize = if (headerExpanded) 26.sp else 20.sp,
+                modifier = Modifier.padding(
+                    start = 76.dp,
+                    bottom = if (headerExpanded) 4.dp else 8.dp
+                )
             )
-            Text(
-                text = "Ordenados por tempo total de jogo.",
-                color = AeroTextSecondary,
-                fontSize = 14.sp,
-                modifier = Modifier.padding(start = 76.dp, bottom = 14.dp)
-            )
+            // Subtítulo seco (sem animação): anima layout junto do scroll = jank.
+            if (headerExpanded) {
+                Text(
+                    text = stringResource(R.string.screens_most_played_subtitle),
+                    color = AeroTextSecondary,
+                    fontSize = 14.sp,
+                    modifier = Modifier.padding(start = 76.dp, bottom = 14.dp)
+                )
+            }
 
             when {
                 isScanning -> {
@@ -184,7 +211,7 @@ fun PlayedScreen(
                 ranked.isEmpty() -> {
                     Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
                         Text(
-                            text = "Nada por aqui ainda.\nJogue algo que ele aparece neste ranking.",
+                            text = stringResource(R.string.screens_most_played_empty),
                             color = AeroTextSecondary,
                             textAlign = TextAlign.Center,
                             modifier = Modifier.fillMaxWidth()
@@ -193,6 +220,7 @@ fun PlayedScreen(
                 }
                 else -> {
                     LazyColumn(
+                        state = listState,
                         verticalArrangement = Arrangement.spacedBy(10.dp),
                         contentPadding = PaddingValues(start = 76.dp, end = 32.dp, bottom = 12.dp),
                         modifier = Modifier.weight(1f)
@@ -253,14 +281,14 @@ fun PlayedScreen(
                                         maxLines = 1
                                     )
                                     Text(
-                                        text = displayGame.game.console ?: "Aplicativo",
+                                        text = displayGame.game.console ?: stringResource(R.string.screens_console_fallback_app),
                                         color = AeroTextSecondary,
                                         fontSize = 13.sp,
                                         maxLines = 1
                                     )
                                     Text(
                                         text = "${PlayTimeStore.formatShort(play.totalMillis)} • " +
-                                            "${play.sessions}x • ${PlayTimeStore.formatLastPlayed(play.lastPlayedEpoch)}",
+                                            "${play.sessions}x • ${PlayTimeStore.formatLastPlayed(context, play.lastPlayedEpoch)}",
                                         color = AeroTextSecondary,
                                         fontSize = 13.sp,
                                         maxLines = 1

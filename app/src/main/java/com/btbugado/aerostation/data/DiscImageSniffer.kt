@@ -2,6 +2,8 @@ package com.btbugado.aerostation.data
 
 import android.content.Context
 import android.net.Uri
+import java.io.FileInputStream
+import java.nio.ByteBuffer
 
 /**
  * Descobre o console real de uma imagem .iso (setor 2048) lendo o conteúdo:
@@ -115,6 +117,21 @@ object DiscImageSniffer {
     /** Lê [length] bytes do [offset] (abre um stream novo por chamada). */
     private fun readRange(context: Context, uri: Uri, offset: Long, length: Int): ByteArray? {
         if (length <= 0) return null
+        // Seek direto pelo fd: pular via skip() em SAF pode ler-e-descartar
+        // gigabytes (um .iso de jogo de PC), o que prendia o scan.
+        runCatching {
+            context.contentResolver.openFileDescriptor(uri, "r")?.use { pfd ->
+                FileInputStream(pfd.fileDescriptor).channel.use { channel ->
+                    channel.position(offset)
+                    val out = ByteBuffer.allocate(length)
+                    while (out.hasRemaining()) {
+                        if (channel.read(out) < 0) break
+                    }
+                    out.flip()
+                    if (!out.hasRemaining()) null else out.array().copyOf(out.remaining())
+                }
+            }
+        }.getOrNull()?.let { return it }
         return try {
             context.contentResolver.openInputStream(uri)?.use { stream ->
                 var remaining = offset

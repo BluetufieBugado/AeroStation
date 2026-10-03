@@ -2,6 +2,8 @@ package com.btbugado.aerostation.data
 
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import android.content.Context
+import com.btbugado.aerostation.R
 import org.json.JSONArray
 import org.json.JSONObject
 import java.net.HttpURLConnection
@@ -103,7 +105,7 @@ object RetroAchievementsApi {
             }.getOrDefault(RaResult.NetworkError)
         }
 
-    suspend fun getRecentlyPlayed(username: String, apiKey: String): RaResult<List<RaPlayedGame>> =
+    suspend fun getRecentlyPlayed(context: Context, username: String, apiKey: String): RaResult<List<RaPlayedGame>> =
         withContext(Dispatchers.IO) {
             val array = getJsonArray(
                 "API_GetUserRecentlyPlayedGames.php" +
@@ -115,9 +117,10 @@ object RetroAchievementsApi {
                 val games = ArrayList<RaPlayedGame>(array.length())
                 for (i in 0 until array.length()) {
                     val o = array.getJSONObject(i)
+                    val gameId = o.optInt("GameID", 0)
                     games += RaPlayedGame(
-                        gameId = o.optInt("GameID", 0),
-                        title = o.optString("Title", "Jogo ${o.optInt("GameID", 0)}"),
+                        gameId = gameId,
+                        title = o.optString("Title", context.getString(R.string.screens_ra_game_fallback_title, gameId)),
                         consoleName = o.optString("ConsoleName", ""),
                         // A API já devolve "/Images/xxxx.png" com o prefixo
                         // (antes duplicávamos e dava 404 em tudo).

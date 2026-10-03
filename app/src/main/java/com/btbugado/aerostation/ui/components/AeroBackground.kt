@@ -7,16 +7,39 @@ import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import kotlinx.coroutines.awaitCancellation
+import kotlinx.coroutines.delay
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.compose.ui.viewinterop.AndroidView
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import android.graphics.Matrix
+import android.graphics.SurfaceTexture
+import android.media.MediaPlayer
+import android.view.Surface
+import android.view.TextureView
+import coil.compose.AsyncImage
+import com.btbugado.aerostation.data.AppTheme
+import com.btbugado.aerostation.data.ThemeEngine
+import com.btbugado.aerostation.data.ThemeStore
 import com.btbugado.aerostation.ui.theme.AeroGlassWhite
 import com.btbugado.aerostation.ui.theme.AeroGlassWhiteStrong
 import com.btbugado.aerostation.ui.theme.AeroHighlight
@@ -33,11 +56,18 @@ import kotlin.random.Random
  * inferior (aceno ao XMB da Sony, mas em vidro/aqua Aero). Tudo desenhado em
  * Canvas (sem bitmap/gif), então o custo de performance é mínimo.
  *
- * No futuro: trocar por um GIF/vídeo escolhido pelo usuário, mantendo este
- * como fallback padrão.
+ * Com tema personalizado: se o tema tem fundo, ele aparece em tela cheia
+ * por baixo de tudo (com véu escuro pra manter o texto legível):
+ * - Imagem ou GIF/WebP animado: via Coil (o gif anima sozinho).
+ * - Vídeo curto: player em loop, mudo, pausado fora do app.
+ * As bolhas/ondas de vidro continuam por cima, nas cores do tema.
  */
 @Composable
 fun AeroBackground(modifier: Modifier = Modifier) {
+    // Lê o ativo aqui: trocar de tema recompõe só o fundo (e o resto do app
+    // pelas cores, cada um na sua).
+    val bgImagePath = ThemeEngine.active.backgroundImagePath
+    val bgCrop = ThemeEngine.active.backgroundFit != AppTheme.FIT_FIT
     val bubbles = remember {
         List(14) {
             Bubble(
@@ -60,13 +90,43 @@ fun AeroBackground(modifier: Modifier = Modifier) {
         label = "time"
     )
 
-    Canvas(modifier = modifier.fillMaxSize()) {
-        // Gradiente de fundo estilo céu/água
-        drawRect(
-            brush = Brush.verticalGradient(
-                colors = listOf(AeroSkyTop, AeroSkyMid, AeroSkyBottom)
+    Box(modifier = modifier.fillMaxSize()) {
+        // Fundo do tema (quando há): cobre tudo, sem distorcer.
+        if (bgImagePath != null) {
+            if (ThemeStore.isVideoBackground(bgImagePath)) {
+                VideoBackground(path = bgImagePath, crop = bgCrop)
+            } else {
+                AsyncImage(
+                    model = bgImagePath,
+                    contentDescription = null,
+                    contentScale = if (bgCrop) ContentScale.Crop else ContentScale.Fit,
+                    modifier = Modifier.fillMaxSize()
+                )
+            }
+            // Véu escuro: texto branco continua legível em foto clara.
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color.Black.copy(alpha = 0.38f))
             )
-        )
+        }
+
+        Canvas(modifier = Modifier.fillMaxSize()) {
+            // Gradiente de fundo estilo céu/água (some se há foto? não: vira
+            // véu colorido por cima da foto, mantendo a identidade do tema).
+            drawRect(
+                brush = Brush.verticalGradient(
+                    colors = if (bgImagePath == null) {
+                        listOf(AeroSkyTop, AeroSkyMid, AeroSkyBottom)
+                    } else {
+                        listOf(
+                            AeroSkyTop.copy(alpha = 0.45f),
+                            AeroSkyMid.copy(alpha = 0.25f),
+                            AeroSkyBottom.copy(alpha = 0.35f)
+                        )
+                    }
+                )
+            )
 
         // Faixa de "brilho" horizontal sutil (efeito glossy)
         drawRect(
@@ -143,7 +203,8 @@ fun AeroBackground(modifier: Modifier = Modifier) {
                 style = Stroke(width = 2f)
             )
         }
-    }
+        } // Canvas
+    } // Box
 }
 
 private data class Wave(
@@ -183,3 +244,167 @@ private data class Bubble(
     val speed: Float,
     val phase: Float
 )
+
+/**
+ * Vídeo de fundo em loop: TextureView + MediaPlayer preenchendo por CROP
+ * (matriz de escala + centralização — a receita de vídeo-papel-de-parede).
+ * Se o vídeo for 16:9 e a tela 2340x1080, ele cresce até cobrir e o
+ * excedente vaza pra fora: sem faixas pretas. (O VideoView sozinho só sabe
+ * "fit", e o zoom na view não mexe na superfície dele em todo aparelho —
+ * foi o que deixou as bordas pra trás.)
+ *
+ * Mudo (a música do tema já toca por outro canal) e pausado quando o app
+ * sai de cena (emulador por cima etc). Prefira vídeos curtos.
+ */
+@Composable
+private fun VideoBackground(path: String, crop: Boolean) {
+    val lifecycleOwner = LocalLifecycleOwner.current
+    var textureView by remember(path) { mutableStateOf<TextureView?>(null) }
+    var surface by remember(path) { mutableStateOf<Surface?>(null) }
+    var player by remember(path) { mutableStateOf<MediaPlayer?>(null) }
+    var videoSize by remember(path) { mutableStateOf<Pair<Int, Int>?>(null) }
+    var viewSize by remember(path) { mutableStateOf<Pair<Int, Int>?>(null) }
+    // Deveria estar tocando? (false no pause: relógio do watchdog para).
+    var shouldPlay by remember(path) { mutableStateOf(true) }
+
+    fun applyCropTransform() {
+        val tv = textureView ?: return
+        // "Ajustar": sem matriz (o TextureView mostra tudo sozinho).
+        if (!crop) {
+            tv.setTransform(null)
+            return
+        }
+        val (vidW, vidH) = videoSize ?: return
+        val (vw, vh) = viewSize ?: return
+        if (vidW <= 0 || vidH <= 0 || vw <= 0 || vh <= 0) return
+        val scale = maxOf(vw.toFloat() / vidW, vh.toFloat() / vidH)
+        val dx = (vw - vidW * scale) / 2f
+        val dy = (vh - vidH * scale) / 2f
+        val matrix = Matrix()
+        matrix.setScale(scale, scale)
+        matrix.postTranslate(dx, dy)
+        tv.setTransform(matrix)
+    }
+
+    // Trocar Preencher/Ajustar com o tema ativo reaplica na hora.
+    LaunchedEffect(crop) { applyCropTransform() }
+
+    // DONO ÚNICO do player: nasce uma vez por vídeo e é solto no dispose.
+    // A superfície entra e sai (abre jogo, apaga tela...): em vez de criar
+    // outro player a cada volta (vazava decoder até congelar), gruda a
+    // superfície nova no MESMO player via setSurface.
+    LaunchedEffect(path) {
+        val mp = MediaPlayer()
+        player = mp
+        runCatching {
+            mp.setDataSource(path)
+            mp.isLooping = true
+            mp.setVolume(0f, 0f)
+            mp.setOnVideoSizeChangedListener { _, w, h ->
+                if (w > 0 && h > 0) {
+                    videoSize = w to h
+                    applyCropTransform()
+                }
+            }
+            mp.setOnPreparedListener {
+                surface?.let { runCatching { mp.setSurface(it) } }
+                applyCropTransform()
+                if (shouldPlay) runCatching { mp.start() }
+            }
+            mp.prepareAsync()
+        }
+        try {
+            awaitCancellation()
+        } finally {
+            runCatching { mp.stop() }
+            runCatching { mp.release() }
+            if (player === mp) player = null
+        }
+    }
+
+    // Superfície nova? Gruda no player atual e garante o play.
+    LaunchedEffect(path, surface, player) {
+        val mp = player ?: return@LaunchedEffect
+        val s = surface ?: return@LaunchedEffect
+        runCatching { mp.setSurface(s) }
+        applyCropTransform()
+        if (shouldPlay) runCatching { if (!mp.isPlaying) mp.start() }
+    }
+
+    // Cão de guarda: se deveria tocar e parou (codec soluçou, superfície
+    // trocou no meio do loop...), retoma sozinho. Só roda com o fundo ativo.
+    LaunchedEffect(path) {
+        while (true) {
+            delay(5000)
+            val mp = player ?: continue
+            if (!shouldPlay || surface == null) continue
+            val playing = runCatching { mp.isPlaying }.getOrDefault(true)
+            if (!playing) runCatching { mp.start() }
+        }
+    }
+
+    DisposableEffect(lifecycleOwner, path) {
+        val observer = LifecycleEventObserver { _, event ->
+            when (event) {
+                Lifecycle.Event.ON_PAUSE -> {
+                    shouldPlay = false
+                    runCatching { player?.pause() }
+                }
+                Lifecycle.Event.ON_RESUME -> {
+                    shouldPlay = true
+                    runCatching {
+                        player?.let { if (!it.isPlaying) it.start() }
+                    }
+                }
+                else -> Unit
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
+
+    AndroidView(
+        factory = { ctx ->
+            TextureView(ctx).apply {
+                surfaceTextureListener = object : TextureView.SurfaceTextureListener {
+                    override fun onSurfaceTextureAvailable(
+                        st: SurfaceTexture, width: Int, height: Int
+                    ) {
+                        surface = Surface(st)
+                    }
+
+                    override fun onSurfaceTextureSizeChanged(
+                        st: SurfaceTexture, width: Int, height: Int
+                    ) = Unit
+
+                    override fun onSurfaceTextureDestroyed(st: SurfaceTexture): Boolean {
+                        surface = null
+                        return true
+                    }
+
+                    override fun onSurfaceTextureUpdated(st: SurfaceTexture) = Unit
+                }
+                textureView = this
+            }
+        },
+        modifier = Modifier
+            .fillMaxSize()
+            .onGloballyPositioned { coordinates ->
+                val size = coordinates.size
+                if (size.height > 0) {
+                    viewSize = size.width to size.height
+                    applyCropTransform()
+                }
+            }
+    )
+
+    DisposableEffect(path) {
+        // O player é solto no finally do LaunchedEffect dono; aqui só a
+        // superfície (senão o dispose leria o player do tema NOVO e o
+        // mataria por engano na troca de fundo).
+        onDispose {
+            runCatching { surface?.release() }
+            surface = null
+        }
+    }
+}

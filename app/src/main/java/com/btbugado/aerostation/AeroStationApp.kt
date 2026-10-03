@@ -1,12 +1,14 @@
 package com.btbugado.aerostation
 
 import android.app.Application
+import android.content.Context
 import android.os.Build
 import coil.ImageLoader
 import coil.ImageLoaderFactory
 import coil.decode.GifDecoder
 import coil.decode.ImageDecoderDecoder
 import coil.decode.VideoFrameDecoder
+import com.btbugado.aerostation.data.LanguageStore
 
 /**
  * ImageLoader global com suporte a animados e vídeo: GIF e WebP animado
@@ -15,6 +17,10 @@ import coil.decode.VideoFrameDecoder
  * quadros pretos de abertura).
  */
 class AeroStationApp : Application(), ImageLoaderFactory {
+    override fun attachBaseContext(base: Context) {
+        super.attachBaseContext(LanguageStore.wrap(base))
+    }
+
     override fun newImageLoader(): ImageLoader =
         ImageLoader.Builder(this)
             .components {

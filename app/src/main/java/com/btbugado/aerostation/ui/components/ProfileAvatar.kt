@@ -14,8 +14,10 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
+import com.btbugado.aerostation.R
 
 /**
  * Avatar do usuário no canto superior esquerdo.
@@ -61,7 +63,7 @@ fun ProfileAvatar(
         if (imagePath != null) {
             AsyncImage(
                 model = imagePath,
-                contentDescription = "Foto de perfil",
+                contentDescription = stringResource(R.string.screens_profile_avatar_desc),
                 modifier = Modifier
                     .size(42.dp)
                     .clip(CircleShape)

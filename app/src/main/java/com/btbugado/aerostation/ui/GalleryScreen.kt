@@ -42,6 +42,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -77,6 +78,8 @@ import com.btbugado.aerostation.ui.components.GamepadDialogScope
 import com.btbugado.aerostation.ui.components.LocalDpadOverride
 import com.btbugado.aerostation.ui.components.LocalGamepadCursor
 import com.btbugado.aerostation.ui.components.LocalHidePadForOverlay
+import androidx.compose.ui.res.stringResource
+import com.btbugado.aerostation.R
 import com.btbugado.aerostation.ui.components.LocalVirtualPadVisible
 import com.btbugado.aerostation.ui.components.LocalHideNavForOverlay
 import com.btbugado.aerostation.ui.components.LocalTouchActionsEnabled
@@ -137,13 +140,16 @@ fun GalleryScreen(
             reloadTick++
             Toast.makeText(
                 context,
-                if (pendingFolderMode) "Pasta mista adicionada!" else "Pasta de jogos adicionada!",
+                if (pendingFolderMode) context.getString(R.string.gallery_folder_mixed_added) else context.getString(R.string.gallery_folder_games_added),
                 Toast.LENGTH_SHORT
             ).show()
         }
     }
 
     LaunchedEffect(reloadTick, folders) {
+        // Pastas antigas (só leitura): eleva pra escrita antes de tudo, pra
+        // o apagar funcionar sem o usuário refazer a pasta.
+        MediaFolderStore.ensureWriteAccess(context)
         items = withContext(Dispatchers.IO) {
             // Nomes só interessam se há pasta mista; sessões sempre (filtro
             // misto por horário + atribuição pros tiles da Home).
@@ -177,13 +183,11 @@ fun GalleryScreen(
         if (selected == item) selected = null
         // Arquivos SAF apagam direto pelo DocumentsContract (a permissão da
         // pasta já foi concedida); o diálogo de confirmação é o nosso.
-        val ok = runCatching {
-            DocumentsContract.deleteDocument(context.contentResolver, item.uri)
-        }.getOrDefault(false)
+        val ok = deleteGalleryMedia(context, item.uri)
         pendingDelete = null
         Toast.makeText(
             context,
-            if (ok) "Apagado." else "Não consegui apagar.",
+            if (ok) context.getString(R.string.gallery_deleted_ok) else context.getString(R.string.gallery_deleted_error),
             Toast.LENGTH_SHORT
         ).show()
         if (ok) reloadTick++
@@ -208,6 +212,15 @@ fun GalleryScreen(
     }
     // Posição da grade preservada ao abrir/fechar o viewer.
     val gridState = rememberLazyGridState()
+    // Header colapsável: no topo o "Álbum" é grande; rolou pra baixo ele
+    // encolhe — os filtros ficam sempre visíveis (são o controle da tela
+    // e alvos de foco do gamepad, não podem sumir).
+    val albumHeaderExpanded by remember {
+        derivedStateOf {
+            gridState.firstVisibleItemIndex == 0 &&
+                gridState.firstVisibleItemScrollOffset < 120
+        }
+    }
 
     Box(modifier = Modifier.fillMaxSize()) {
         Column(
@@ -225,9 +238,17 @@ fun GalleryScreen(
             }
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.padding(start = 76.dp, end = 32.dp, bottom = 4.dp)
+                modifier = Modifier.padding(
+                    start = 76.dp,
+                    end = 32.dp,
+                    bottom = if (albumHeaderExpanded) 4.dp else 8.dp
+                )
             ) {
-                Text(text = "Álbum", color = AeroTextPrimary, fontSize = 26.sp)
+                Text(
+                    text = stringResource(R.string.gallery_album_title),
+                    color = AeroTextPrimary,
+                    fontSize = if (albumHeaderExpanded) 26.sp else 20.sp
+                )
                 Spacer(modifier = Modifier.width(12.dp))
                 Text(
                     text = if (all == null) "" else "(${shown.size})",
@@ -237,32 +258,37 @@ fun GalleryScreen(
             }
 
             // Filtro estilo Switch (Y): Tudo / Fotos / Vídeos + pastas.
+            // Sempre visível (inclusive colapsado): é o controle da tela.
             if (all != null) {
                 Row(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                     verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(start = 76.dp, end = 32.dp, bottom = 12.dp)
+                        .padding(
+                            start = 76.dp,
+                            end = 32.dp,
+                            bottom = if (albumHeaderExpanded) 12.dp else 8.dp
+                        )
                 ) {
                     FilterPill(
-                        label = "Tudo",
+                        label = stringResource(R.string.common_all),
                         selected = filter == GalleryFilter.ALL,
                         onClick = { filter = GalleryFilter.ALL }
                     )
                     FilterPill(
-                        label = "Fotos",
+                        label = stringResource(R.string.gallery_filter_photos),
                         selected = filter == GalleryFilter.PHOTOS,
                         onClick = { filter = GalleryFilter.PHOTOS }
                     )
                     FilterPill(
-                        label = "Vídeos",
+                        label = stringResource(R.string.gallery_filter_videos),
                         selected = filter == GalleryFilter.VIDEOS,
                         onClick = { filter = GalleryFilter.VIDEOS }
                     )
                     Spacer(modifier = Modifier.weight(1f))
                     FilterPill(
-                        label = if (folders.isEmpty()) "📁 Pastas" else "📁 ${folders.size}",
+                        label = if (folders.isEmpty()) stringResource(R.string.gallery_folders_button) else "📁 ${folders.size}",
                         selected = false,
                         onClick = { showFolders = true }
                     )
@@ -284,7 +310,7 @@ fun GalleryScreen(
                         verticalArrangement = Arrangement.Center
                     ) {
                         Text(
-                            text = "O \u00e1lbum mostra s\u00f3 as suas pastas.\nAdicione a Game Media, a pasta do\nemulador ou do app de grava\u00e7\u00e3o.",
+                            text = stringResource(R.string.gallery_empty_no_folders),
                             color = AeroTextSecondary,
                             textAlign = TextAlign.Center,
                             modifier = Modifier.fillMaxWidth()
@@ -296,13 +322,13 @@ fun GalleryScreen(
                                 autoFocus = gamepadActive,
                                 onConfirm = { showFolders = true }
                             )
-                        ) { Text("Adicionar pasta") }
+                        ) { Text(stringResource(R.string.gallery_add_folder)) }
                     }
                 }
                 shown.isEmpty() -> {
                     Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
                         Text(
-                            text = "Nada por aqui ainda.\nCapture algo no jogo que aparece aqui.",
+                            text = stringResource(R.string.gallery_empty_no_items),
                             color = AeroTextSecondary,
                             textAlign = TextAlign.Center
                         )
@@ -354,8 +380,8 @@ fun GalleryScreen(
             GamepadDialogScope {
                 AlertDialog(
                     onDismissRequest = { pendingDelete = null },
-                    title = { Text("Apagar?") },
-                    text = { Text("Apagar ${item.displayName} da galeria?") },
+                    title = { Text(stringResource(R.string.gallery_delete_title)) },
+                    text = { Text(stringResource(R.string.gallery_delete_message, item.displayName)) },
                     confirmButton = {
                         TextButton(
                             onClick = { confirmDelete(item) },
@@ -363,7 +389,7 @@ fun GalleryScreen(
                                 autoFocus = true,
                                 onConfirm = { confirmDelete(item) }
                             )
-                        ) { Text("Apagar") }
+                        ) { Text(stringResource(R.string.common_delete)) }
                     },
                     dismissButton = {
                         TextButton(
@@ -372,7 +398,7 @@ fun GalleryScreen(
                                 onConfirm = { pendingDelete = null },
                                 onBack = { pendingDelete = null }
                             )
-                        ) { Text("Cancelar") }
+                        ) { Text(stringResource(R.string.common_cancel)) }
                     },
                     shape = RoundedCornerShape(20.dp)
                 )
@@ -419,17 +445,17 @@ private fun MediaFoldersDialog(
     GamepadDialogScope {
         AlertDialog(
             onDismissRequest = onDismiss,
-            title = { Text("Pastas da galeria") },
+            title = { Text(stringResource(R.string.gallery_folders_title)) },
             text = {
                 Column {
                     Text(
-                        text = "Jogos mostra tudo da pasta. Mista mostra só arquivos com nome de jogo/app da sua biblioteca.",
+                        text = stringResource(R.string.gallery_folders_description),
                         fontSize = 13.sp
                     )
                     Spacer(modifier = Modifier.height(8.dp))
                     LazyColumn(modifier = Modifier.height(200.dp)) {
                         if (folders.isEmpty()) {
-                            item { Text("Nenhuma pasta ainda.", fontSize = 13.sp) }
+                            item { Text(stringResource(R.string.gallery_folders_empty), fontSize = 13.sp) }
                         } else {
                             items(folders, key = { it.uri }) { folder ->
                                 Row(
@@ -446,7 +472,7 @@ private fun MediaFoldersDialog(
                                             maxLines = 1
                                         )
                                         Text(
-                                            text = if (folder.matchNamesOnly) "Mista (filtra por nome)" else "Jogos (tudo)",
+                                            text = if (folder.matchNamesOnly) stringResource(R.string.gallery_folder_type_mixed) else stringResource(R.string.gallery_folder_type_games),
                                             color = AeroTextSecondary,
                                             fontSize = 12.sp
                                         )
@@ -472,21 +498,21 @@ private fun MediaFoldersDialog(
                         onConfirm = onAddGames,
                         onBack = onDismiss
                     )
-                ) { Text("+ Jogos") }
+                ) { Text(stringResource(R.string.gallery_add_games)) }
             },
             dismissButton = {
                 Row {
                     TextButton(
                         onClick = onAddMixed,
                         modifier = Modifier.gamepadFocusable(onConfirm = onAddMixed)
-                    ) { Text("+ Mista") }
+                    ) { Text(stringResource(R.string.gallery_add_mixed)) }
                     TextButton(
                         onClick = onDismiss,
                         modifier = Modifier.gamepadFocusable(
                             onConfirm = onDismiss,
                             onBack = onDismiss
                         )
-                    ) { Text("Fechar") }
+                    ) { Text(stringResource(R.string.common_close)) }
                 }
             },
             shape = RoundedCornerShape(20.dp)
@@ -603,6 +629,22 @@ private fun GalleryCell(
  * - Controle FÍSICO: cinema — botões e dicas somem, toque revela/esconde.
  * Nos dois, B volta e X apaga (com confirmação); ←/→ no vídeo viram seek.
  */
+/**
+ * Apaga uma mídia da galeria. Se falhar, tenta elevar a permissão das
+ * pastas pra escrita e repete uma vez (cobre pastas adicionadas antes da
+ * escrita existir). Do contrário desiste e a UI avisa.
+ */
+private fun deleteGalleryMedia(context: Context, uri: Uri): Boolean {
+    if (tryDeleteGalleryMedia(context, uri)) return true
+    MediaFolderStore.ensureWriteAccess(context)
+    return tryDeleteGalleryMedia(context, uri)
+}
+
+private fun tryDeleteGalleryMedia(context: Context, uri: Uri): Boolean =
+    runCatching {
+        DocumentsContract.deleteDocument(context.contentResolver, uri)
+    }.getOrDefault(false)
+
 @Composable
 private fun GalleryViewer(
     item: GalleryItem,
@@ -724,11 +766,11 @@ private fun GalleryViewer(
                     .fillMaxWidth()
                     .padding(top = 16.dp, start = 20.dp, end = 20.dp)
             ) {
-                FilterPill(label = "‹ Voltar", selected = false, onClick = onClose, alwaysClickable = true)
-                FilterPill(label = "🗑 Apagar", selected = false, onClick = onDelete, alwaysClickable = true)
+                FilterPill(label = stringResource(R.string.common_back_chevron), selected = false, onClick = onClose, alwaysClickable = true)
+                FilterPill(label = stringResource(R.string.gallery_viewer_delete), selected = false, onClick = onDelete, alwaysClickable = true)
             }
             Text(
-                text = if (item.isVideo) "◀ ▶ ±10s • Ⓑ Voltar • Ⓧ Apagar" else "Ⓑ Voltar   Ⓧ Apagar",
+                    text = if (item.isVideo) stringResource(R.string.gallery_viewer_hints_video) else stringResource(R.string.gallery_viewer_hints_photo),
                 color = AeroTextSecondary,
                 fontSize = 13.sp,
                 modifier = Modifier
@@ -844,8 +886,11 @@ private fun VideoPlayer(
     // sozinho ao sair da composição — o áudio fantasma segurava o foco e a
     // música de fundo nunca recebia o ganho de volta. stopPlayback libera o
     // MediaPlayer interno e onVideoClosed restabelece o foco do zero (cobre
-    // o caso em que o evento de ganho se perde no caminho).
+    // o caso em que o evento de ganho se perde no caminho). O onVideoOpened
+    // na entrada suprime a música: o VideoView não pede foco de áudio, então
+    // sem isso ela tocaria por cima do vídeo.
     DisposableEffect(uri) {
+        AppAudio.onVideoOpened()
         onDispose {
             dpadOverride?.value = null
             runCatching { viewRef?.stopPlayback() }

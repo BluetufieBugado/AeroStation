@@ -20,14 +20,27 @@ data class VirtualPadLayout(
     val r1Dx: Float = 0f,
     val r1Dy: Float = 0f,
     /** Escala dos botões (1 = tamanho padrão). */
-    val scale: Float = 1f
+    val scale: Float = 1f,
+    /** Tamanho por grupo (multiplica a global): direcional, ações, ombros. */
+    val dpadScale: Float = 1f,
+    val actionsScale: Float = 1f,
+    val shoulderScale: Float = 1f,
+    /** Opacidade geral dos controles (1 = sólido). Ajuda em PNG chamativo. */
+    val padOpacity: Float = 1f
 ) {
     companion object {
         const val MIN_SCALE = 0.75f
         const val MAX_SCALE = 1.4f
+        const val MIN_GROUP_SCALE = 0.6f
+        const val MAX_GROUP_SCALE = 1.6f
+        const val MIN_OPACITY = 0.3f
     }
 
     val safeScale: Float get() = scale.coerceIn(MIN_SCALE, MAX_SCALE)
+    val safeDpadScale: Float get() = dpadScale.coerceIn(MIN_GROUP_SCALE, MAX_GROUP_SCALE)
+    val safeActionsScale: Float get() = actionsScale.coerceIn(MIN_GROUP_SCALE, MAX_GROUP_SCALE)
+    val safeShoulderScale: Float get() = shoulderScale.coerceIn(MIN_GROUP_SCALE, MAX_GROUP_SCALE)
+    val safePadOpacity: Float get() = padOpacity.coerceIn(MIN_OPACITY, 1f)
 }
 
 /** Guarda o layout do controle virtual. */
@@ -45,7 +58,11 @@ object VirtualPadLayoutStore {
             l1Dy = prefs.getFloat("l1Dy", 0f),
             r1Dx = prefs.getFloat("r1Dx", 0f),
             r1Dy = prefs.getFloat("r1Dy", 0f),
-            scale = prefs.getFloat("scale", 1f)
+            scale = prefs.getFloat("scale", 1f),
+            dpadScale = prefs.getFloat("dpadScale", 1f),
+            actionsScale = prefs.getFloat("actionsScale", 1f),
+            shoulderScale = prefs.getFloat("shoulderScale", 1f),
+            padOpacity = prefs.getFloat("padOpacity", 1f)
         )
     }
 
@@ -61,6 +78,10 @@ object VirtualPadLayoutStore {
             .putFloat("r1Dx", layout.r1Dx)
             .putFloat("r1Dy", layout.r1Dy)
             .putFloat("scale", layout.scale)
+            .putFloat("dpadScale", layout.dpadScale)
+            .putFloat("actionsScale", layout.actionsScale)
+            .putFloat("shoulderScale", layout.shoulderScale)
+            .putFloat("padOpacity", layout.padOpacity)
             .apply()
     }
 

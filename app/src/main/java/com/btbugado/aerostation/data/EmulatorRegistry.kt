@@ -184,7 +184,22 @@ object EmulatorRegistry {
         "Atari 2600" to listOf(
             retroArch("stella")
         ),
+        // Yaba Sanshiro 2 (free e Pro): sem boot externo confiável (vide
+        // issue do Daijisho — activity de jogo não exportada), então abrem
+        // a home pro boot manual. Boot direto no Saturn é pelo core yabause
+        // do RetroArch. Ordem: standalone primeiro (é o que o usuário de
+        // Saturn costuma ter), RetroArch de fallback.
         "Saturn" to listOf(
+            EmulatorTarget(
+                "org.devmiyax.yabasanshioro2",
+                "",
+                "Yaba Sanshiro 2"
+            ),
+            EmulatorTarget(
+                "org.devmiyax.yabasanshioro2.pro",
+                "",
+                "Yaba Sanshiro 2 Pro"
+            ),
             retroArch("yabause")
         ),
         // Sem duplicar a chave: antes eram dois "Dreamcast" no mapOf e o
@@ -238,6 +253,49 @@ object EmulatorRegistry {
                 "Dolphin MMJR"
             )
         ),
+        // Cemu Android (port não-oficial SSimco, experimental): boot via
+        // ACTION_VIEW na EmulationActivity com a URI + mimeType (o filtro
+        // exige scheme content + mime */* + path .wud/.wux/.wua/.wuhb/.iso/
+        // .elf/.rpx). Debug instala lado a lado (applicationIdSuffix).
+        "Wii U" to listOf(
+            EmulatorTarget(
+                "info.cemu.cemu",
+                "info.cemu.cemu.emulation.EmulationActivity",
+                "Cemu"
+            ),
+            EmulatorTarget(
+                "info.cemu.cemu.debug",
+                "info.cemu.cemu.emulation.EmulationActivity",
+                "Cemu (Debug)"
+            )
+        ),
+        // PC (jogos de Windows no Android): GameNative tem boot externo por
+        // ID da loja (action app.gamenative.LAUNCH_GAME + deep link
+        // gamenative://run, confirmados no fonte); Winlator (só a MainActivity
+        // é exportada, as de jogo não) e GameHub (sem API pública) abrem a
+        // home pro boot manual. Ordem: quem boota direto primeiro.
+        "PC" to listOf(
+            EmulatorTarget(
+                "app.gamenative",
+                "app.gamenative.MainActivity",
+                "GameNative"
+            ),
+            EmulatorTarget(
+                "app.gamenative.debug",
+                "app.gamenative.MainActivity",
+                "GameNative (Debug)"
+            ),
+            EmulatorTarget(
+                "com.winlator",
+                "com.winlator.MainActivity",
+                "Winlator"
+            ),
+            EmulatorTarget(
+                "com.xiaoji.egggame",
+                "",
+                "GameHub"
+            )
+        ),
         "PlayStation" to listOf(
             EmulatorTarget(
                 DUCKSTATION_PACKAGE,
@@ -249,13 +307,14 @@ object EmulatorRegistry {
         // NetherSX2 mantém o MESMO pacote/activity do AetherSX2 (é patch em
         // cima dele; os dois nem instalam juntos) — uma entrada cobre ambos,
         // igual o Daijisho faz. Boot via ACTION_VIEW + URI com grant.
-        // ARMSX2: o "come." no pacote é real. A activity do build debug
-        // (kr.co.iefriends...) NÃO existe no release: dumpsys mostra
-        // .MainActivity, .Main e .BootSplashActivity (todas com VIEW).
-        // Mesmo assim o boot direto falha de fora do app: via adb (shell,
-        // que ignora exported) abre, mas intents externos caem no fallback.
-        // Diagnóstico: activities não exportadas — só o ARMSX2 abrindo isso
-        // resolve. Mantido aqui pra detecção/selo; o boot cai na home.
+        // ARMSX2 tem 3 pacotes: GitHub stable (com.armsx2), nightly
+        // (com.armsx2.nightly, instala lado a lado) e Play
+        // (come.nanodata.armsx2 — o "come." é real). O namespace das
+        // activities é sempre com.armsx2 (.BootSplashActivity recebe o cold
+        // start e repassa pro .Main; .MainActivity é alias pro .Main).
+        // Boot via ACTION_VIEW com a URI como dado, SEM mimeType (o filtro
+        // declara só scheme content/file) + grant de leitura. .cue não boota
+        // (o core não tem cue parser) — resolve pra .bin irmão antes de enviar.
         "PlayStation 2" to listOf(
             EmulatorTarget(
                 "xyz.aethersx2.android",
@@ -263,9 +322,19 @@ object EmulatorRegistry {
                 "AetherSX2 / NetherSX2"
             ),
             EmulatorTarget(
+                "com.armsx2",
+                "com.armsx2.MainActivity",
+                "ARMSX2 (GitHub)"
+            ),
+            EmulatorTarget(
+                "com.armsx2.nightly",
+                "com.armsx2.MainActivity",
+                "ARMSX2 Nightly"
+            ),
+            EmulatorTarget(
                 "come.nanodata.armsx2",
                 "com.armsx2.MainActivity",
-                "ARMSX2"
+                "ARMSX2 (Play)"
             )
         ),
         // J2ME Loader: boot via ACTION_VIEW com a URI do .jar direto na
@@ -316,13 +385,26 @@ object EmulatorRegistry {
 
     /**
      * Activities candidatas extras por pacote (tentadas em ordem, antes do
-     * implícito). Pra ARMSX2 o release tem .MainActivity e .Main — a salva
-     * na configuração vai primeiro, as demais completam.
+     * implícito). ARMSX2: .BootSplashActivity primeiro (é a LAUNCHER, recebe
+     * o cold start e repassa data/extras pro .Main), depois o alias
+     * .MainActivity e o .Main.
      */
+    private val armsx2BootActivities = listOf(
+        "com.armsx2.BootSplashActivity",
+        "com.armsx2.MainActivity",
+        "com.armsx2.Main"
+    )
+
     private val extraViewActivities = mapOf(
-        "come.nanodata.armsx2" to listOf(
-            "com.armsx2.MainActivity",
-            "com.armsx2.Main"
+        "com.armsx2" to armsx2BootActivities,
+        "com.armsx2.nightly" to armsx2BootActivities,
+        "come.nanodata.armsx2" to armsx2BootActivities,
+        // Cemu só tem a EmulationActivity (a salva vai primeiro, sem extras).
+        "info.cemu.cemu" to listOf(
+            "info.cemu.cemu.emulation.EmulationActivity"
+        ),
+        "info.cemu.cemu.debug" to listOf(
+            "info.cemu.cemu.emulation.EmulationActivity"
         ),
         // Flycast mudou o nome da activity entre versões: a Play Store
         // atual usa com.flycast.emulator.MainActivity, builds antigos usam
@@ -342,6 +424,100 @@ object EmulatorRegistry {
         extraViewActivities[target.packageName]
             ?.filterTo(candidates) { it !in candidates }
         return candidates
+    }
+
+    /** Qualquer pacote do ARMSX2 (GitHub stable, nightly ou Play). */
+    fun isArmsx2Package(packageName: String): Boolean =
+        packageName == "com.armsx2" ||
+            packageName == "com.armsx2.nightly" ||
+            packageName == "come.nanodata.armsx2" ||
+            packageName.startsWith("com.armsx2.")
+
+    /**
+     * Intents de boot direto pro ARMSX2, uma por activity candidata + uma
+     * implícita.
+     *
+     * Receita confirmada no fonte (MainActivityRuntime.handleExternalLaunchIntent,
+     * BootSplashActivity): ACTION_VIEW com a URI como dado e SEM mimeType (o
+     * filtro declara só scheme content/file — intent com tipo nunca casa no
+     * implícito), + grant de leitura + clipData + EXTRA_STREAM de reserva
+     * (o ARMSX2 também lê EXTRA_STREAM/clipData/extras path/game/rom/uri).
+     * Task nova: sem isso, com o ARMSX2 já aberto o jogo novo pode cair na
+     * instância velha. A URI já vem resolvida (.cue -> .bin irmão).
+     */
+    fun armsx2BootIntents(
+        context: android.content.Context,
+        game: Game,
+        target: EmulatorTarget
+    ): List<android.content.Intent> {
+        val packageName = target.packageName
+        val bootUri = resolveArmsx2BootUri(context, game.uri)
+        val activities = ArrayList<String>(armsx2BootActivities.size + 1)
+        // A salva na configuração primeiro (cobre renome futuro), as demais completam.
+        if (target.activityName.isNotBlank()) activities += target.activityName
+        armsx2BootActivities.filterTo(activities) { it !in activities }
+        val intents = activities.map { activity ->
+            android.content.Intent(android.content.Intent.ACTION_VIEW).apply {
+                setClassName(packageName, activity)
+                data = bootUri
+                putExtra(android.content.Intent.EXTRA_STREAM, bootUri)
+                addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+                addFlags(android.content.Intent.FLAG_ACTIVITY_CLEAR_TOP)
+                addFlags(android.content.Intent.FLAG_ACTIVITY_SINGLE_TOP)
+                clipData = android.content.ClipData.newRawUri("ROM", bootUri)
+            }
+        }
+        return intents + android.content.Intent(android.content.Intent.ACTION_VIEW).apply {
+            setPackage(packageName)
+            data = bootUri
+            putExtra(android.content.Intent.EXTRA_STREAM, bootUri)
+            addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+            clipData = android.content.ClipData.newRawUri("ROM", bootUri)
+        }
+    }
+
+    /**
+     * URI de boot pro ARMSX2: .cue resolve pro .bin irmão na mesma pasta (o
+     * core não tem cue parser e .cue nem está no whitelist dele — bootar .cue
+     * falha sempre). Demais extensões passam direto. Falha = URI original.
+     */
+    fun resolveArmsx2BootUri(context: android.content.Context, uri: android.net.Uri): android.net.Uri {
+        val name = uri.lastPathSegment?.substringAfterLast('/')?.substringAfterLast(':').orEmpty()
+        if (!name.endsWith(".cue", ignoreCase = true)) return uri
+        val head = runCatching {
+            context.contentResolver.openInputStream(uri)?.use { input ->
+                val buf = ByteArray(65536)
+                val n = input.read(buf)
+                if (n <= 0) null else String(buf, 0, n, Charsets.UTF_8)
+            }
+        }.getOrNull() ?: return uri
+        val track = Regex("""(?im)^\s*FILE\s+(?:"([^"]+)"|(\S+))""").find(head)?.let { m ->
+            val quoted = m.groupValues.getOrNull(1).orEmpty()
+            val raw = if (quoted.isNotBlank()) quoted else m.groupValues.getOrNull(2).orEmpty()
+            raw.trim().substringAfterLast('/').substringAfterLast('\\')
+        }.orEmpty()
+        if (track.isBlank()) return uri
+        // 1) DocumentFile (cobre provedores com parent resolvível).
+        runCatching {
+            androidx.documentfile.provider.DocumentFile.fromSingleUri(context, uri)
+                ?.parentFile?.findFile(track)?.takeIf { it.isFile }?.uri
+        }.getOrNull()?.let { return it }
+        // 2) Irmão por manipulação de string (tree/document da externalstorage:
+        // .../tree/<tree>/document/<path%2Fdoc>). Troca só o último segmento.
+        runCatching {
+            val raw = uri.toString()
+            val encoded = android.net.Uri.encode(track)
+            val sepEncoded = raw.lastIndexOf("%2F")
+            val sepPlain = raw.lastIndexOf('/')
+            val (cut, joiner) = if (sepEncoded > sepPlain) sepEncoded to "%2F" else sepPlain to "/"
+            if (cut <= 0) return@runCatching null
+            val sibling = android.net.Uri.parse(raw.substring(0, cut + joiner.length) + encoded)
+            androidx.documentfile.provider.DocumentFile.fromSingleUri(context, sibling)
+                ?.takeIf { it.isFile }?.uri ?: sibling
+        }.getOrNull()?.let { return it }
+        return uri
     }
 
     /**
@@ -673,6 +849,107 @@ object EmulatorRegistry {
         "nsp" -> "application/octet-stream"
         "xci" -> "application/octet-stream"
         else -> "*/*"
+    }
+
+    /** Qualquer pacote do GameNative (release ou debug lado a lado). */
+    fun isGameNativePackage(packageName: String): Boolean =
+        packageName == "app.gamenative" ||
+            packageName == "app.gamenative.debug" ||
+            packageName.startsWith("app.gamenative.")
+
+    /** Lojas que o boot externo do GameNative aceita (enum GameSource dele). */
+    val gameNativeSources = listOf("STEAM", "EPIC", "GOG", "AMAZON")
+
+    /**
+     * Intents de boot direto pro GameNative, pela action própria + deep link.
+     *
+     * Receita confirmada no fonte (IntentLaunchManager.parseLaunchIntent,
+     * chamado na MainActivity inclusive no onNewIntent): action
+     * "app.gamenative.LAUNCH_GAME" com extras "app_id" (int > 0) e
+     * "game_source" (opcional, padrão STEAM), ou VIEW em
+     * gamenative://run?appid=X&gamesource=Y. O boot é pelo jogo INSTALADO
+     * nele (ID da loja), não pelo .exe — igual o Vita3K com Title ID.
+     */
+    fun gameNativeBootIntents(
+        target: EmulatorTarget,
+        appId: Int,
+        source: String
+    ): List<android.content.Intent> {
+        val activity = target.activityName
+            .takeIf { it.isNotBlank() } ?: "app.gamenative.MainActivity"
+        val direct = android.content.Intent("app.gamenative.LAUNCH_GAME").apply {
+            setClassName(target.packageName, activity)
+            putExtra("app_id", appId)
+            putExtra("game_source", source)
+            addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+            addFlags(android.content.Intent.FLAG_ACTIVITY_CLEAR_TOP)
+            addFlags(android.content.Intent.FLAG_ACTIVITY_SINGLE_TOP)
+        }
+        val deepLink = android.content.Intent(android.content.Intent.ACTION_VIEW).apply {
+            setPackage(target.packageName)
+            data = android.net.Uri.parse(
+                "gamenative://run?appid=$appId&gamesource=$source"
+            )
+            addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
+        return listOf(direct, deepLink)
+    }
+
+    /** Winlator/GameHub: sem API de boot externo — só abrem a home. */
+    fun isPcHomeOnlyPackage(packageName: String): Boolean =
+        packageName == "com.winlator" || packageName.startsWith("com.winlator.") ||
+            packageName == "com.xiaoji.egggame" || packageName.startsWith("com.xiaoji.egggame.")
+
+    /** Yaba Sanshiro 2 (free e Pro): idem, sem boot externo confiável. */
+    fun isYabaPackage(packageName: String): Boolean =
+        packageName == "org.devmiyax.yabasanshioro2" ||
+            packageName == "org.devmiyax.yabasanshioro2.pro" ||
+            packageName.startsWith("org.devmiyax.yabasanshioro2")
+
+    /** Qualquer pacote do Cemu Android (release ou debug lado a lado). */
+    fun isCemuPackage(packageName: String): Boolean =
+        packageName == "info.cemu.cemu" ||
+            packageName == "info.cemu.cemu.debug" ||
+            packageName.startsWith("info.cemu.cemu.")
+
+    /**
+     * Intents de boot direto pro Cemu, uma por activity candidata + uma
+     * implícita.
+     *
+     * Diferente do ARMSX2 (filtro só com scheme), o filtro do Cemu exige
+     * scheme content + um mimeType qualquer + path do formato — por isso
+     * TODAS as tentativas levam setDataAndType com tipo curinga, nunca só
+     * data (data sozinha não casa nem no implícito). + grant de leitura +
+     * clipData + task nova (com o Cemu já aberto o jogo novo cairia na
+     * instância velha, que é singleTop mas pode ignorar sem as flags).
+     */
+    fun cemuBootIntents(
+        game: Game,
+        target: EmulatorTarget
+    ): List<android.content.Intent> {
+        val packageName = target.packageName
+        val activities = ArrayList<String>(2)
+        if (target.activityName.isNotBlank()) activities += target.activityName
+        extraViewActivities[packageName]?.filterTo(activities) { it !in activities }
+        if (activities.isEmpty()) activities += "info.cemu.cemu.emulation.EmulationActivity"
+        val intents = activities.map { activity ->
+            android.content.Intent(android.content.Intent.ACTION_VIEW).apply {
+                setClassName(packageName, activity)
+                setDataAndType(game.uri, "*/*")
+                addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+                addFlags(android.content.Intent.FLAG_ACTIVITY_CLEAR_TOP)
+                addFlags(android.content.Intent.FLAG_ACTIVITY_SINGLE_TOP)
+                clipData = android.content.ClipData.newRawUri("ROM", game.uri)
+            }
+        }
+        return intents + android.content.Intent(android.content.Intent.ACTION_VIEW).apply {
+            setPackage(packageName)
+            setDataAndType(game.uri, "*/*")
+            addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+            clipData = android.content.ClipData.newRawUri("ROM", game.uri)
+        }
     }
 
     fun defaultTarget(context: android.content.Context, console: String): EmulatorTarget? {

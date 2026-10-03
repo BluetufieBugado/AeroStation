@@ -19,6 +19,28 @@ object RomScanner {
     /** Limite de segurança pra não deixar o scan rodar pra sempre em pastas gigantes/mal escolhidas. */
     private const val MAX_FILES = 5000
 
+    /**
+     * Pastas que nunca têm jogo: lixeiras/índices do sistema. Junto do filtro
+     * de arquivos ocultos, evita passear por subárvores enormes de apoio — o
+     * caso que prendia o scan em pasta de jogo de PC. Dot-dir DESCONHECIDO
+     * ainda é visitado (pode ser pasta de ROM com nome esquisito).
+     */
+    private val skippedDirNames = setOf(
+        "system volume information",
+        "\$recycle.bin",
+        "found.000",
+        "lost+found",
+        ".thumbnails",
+        ".trash",
+        ".trash-1000",
+        ".spotlight-v100",
+        ".fseventsd",
+        ".temporaryitems",
+        ".documentrevisions-v100",
+        ".vol",
+        ".ds_store"
+    )
+
     /** Arquivo candidato antes do filtro de duplicatas (ex: .bin com .cue). */
     private data class FoundRom(
         val file: DocumentFile,
@@ -47,15 +69,26 @@ object RomScanner {
 
                     if (child.isDirectory) {
                         val name = child.name
+                        if (name == null) {
+                            stack.addLast(child to ancestors)
+                            continue
+                        }
+                        // Só a lista conhecida é pulada: dot-dir desconhecido
+                        // pode ser pasta de ROM com nome esquisito, então
+                        // desce normal (os arquivos ocultos de dentro, esses
+                        // sim, são sempre pulados).
+                        if (name.lowercase() in skippedDirNames) continue
                         stack.addLast(
                             child to (
-                                if (name != null) listOf(name) + ancestors else ancestors
+                                listOf(name) + ancestors
                                 )
                         )
                         continue
                     }
 
                     val fileName = child.name ?: continue
+                    // Oculto (ex: .DS_Store, .nomedia): pula antes do filtro.
+                    if (fileName.startsWith(".")) continue
                     val extension = fileName.substringAfterLast('.', missingDelimiterValue = "").lowercase()
 
                     if (extension.isEmpty() || extension !in RomExtensions.allAcceptedExtensions) {

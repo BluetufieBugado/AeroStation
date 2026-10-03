@@ -1,6 +1,12 @@
 package com.btbugado.aerostation.data
 
+import android.app.AppOpsManager
+import android.app.usage.UsageEvents
+import android.app.usage.UsageStatsManager
 import android.content.Context
+import android.os.Build
+import android.os.Process
+import com.btbugado.aerostation.R
 import org.json.JSONObject
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -40,11 +46,20 @@ object PlayTimeStore {
     private const val KEY_SESSIONS = "sessions_json"
     private const val KEY_PENDING_KEY = "pending_key"
     private const val KEY_PENDING_START = "pending_start"
+    /** Pacote do jogo/emulador aberto (pra medir o foreground real). */
+    private const val KEY_PENDING_PKG = "pending_pkg"
     /** Histórico pra cruzamento com screenshots (últimas N sessões). */
     private const val MAX_SESSIONS = 50
 
     /** Teto por sessão: largou o emulador aberto a noite toda não vira 10h. */
     private const val MAX_SESSION_MILLIS = 12L * 60 * 60 * 1000
+
+    /**
+     * Sessão curta demais pra confiar no UsageStats (atraso de propagação):
+     * sem foreground registrado aqui, vale o relógio de parede. Grande o
+     * bastante pra não perder teste rápido, pequeno pra não criar fantasma.
+     */
+    private const val SHORT_SESSION_GRACE_MILLIS = 5L * 60 * 1000
 
     fun loadAll(context: Context): Map<String, PlayStats> {
         val raw = prefs(context).getString(KEY_STATS, null) ?: return emptyMap()
@@ -68,8 +83,11 @@ object PlayTimeStore {
     /**
      * Marca o início da sessão. Chamado SÓ quando o emulador realmente abriu
      * (não quando falta configuração).
+     *
+     * @param packageName pacote do jogo/emulador aberto (pra medir o tempo
+     * real em primeiro plano no fechamento, em vez do relógio de parede).
      */
-    fun beginSession(context: Context, gameKey: String, nowEpoch: Long = System.currentTimeMillis()) {
+    fun beginSession(context: Context, gameKey: String, packageName: String? = null, nowEpoch: Long = System.currentTimeMillis()) {
         val prefs = prefs(context)
         // Sessão de outra chave ainda pendente (não deveria acontecer, já que
         // só dá pra abrir um jogo por vez voltando ao app): fecha sem perder.
@@ -79,20 +97,41 @@ object PlayTimeStore {
         prefs.edit()
             .putString(KEY_PENDING_KEY, gameKey)
             .putLong(KEY_PENDING_START, nowEpoch)
+            .apply {
+                if (packageName != null) putString(KEY_PENDING_PKG, packageName)
+                else remove(KEY_PENDING_PKG)
+            }
             .commit()
     }
 
     /**
      * Fecha a sessão pendente na volta ao app. Devolve (chave, stats
      * atualizados) ou null se não havia nada pendente.
+     *
+     * Duração = tempo REAL do pacote em primeiro plano na janela (via
+     * UsageStats, que sobrevive a fechar tudo e ignora horas ausente). Sem
+     * permissão ou sem dados, cai no relógio de parede com teto (legado).
      */
     fun endSession(context: Context, nowEpoch: Long = System.currentTimeMillis()): Pair<String, PlayStats>? {
         val prefs = prefs(context)
         val key = prefs.getString(KEY_PENDING_KEY, null) ?: return null
         val start = prefs.getLong(KEY_PENDING_START, 0L)
-        prefs.edit().remove(KEY_PENDING_KEY).remove(KEY_PENDING_START).apply()
+        val pkg = prefs.getString(KEY_PENDING_PKG, null)
+        prefs.edit()
+            .remove(KEY_PENDING_KEY).remove(KEY_PENDING_START).remove(KEY_PENDING_PKG)
+            .apply()
         if (start <= 0L) return null
-        val delta = (nowEpoch - start).coerceIn(0L, MAX_SESSION_MILLIS)
+        val wallDelta = (nowEpoch - start).coerceIn(0L, MAX_SESSION_MILLIS)
+        if (wallDelta <= 0L) return null
+        val delta = if (pkg != null) {
+            when (val fg = foregroundMillis(context, pkg, start, nowEpoch)) {
+                null -> wallDelta
+                0L -> if (wallDelta < SHORT_SESSION_GRACE_MILLIS) wallDelta else 0L
+                else -> fg.coerceAtMost(wallDelta)
+            }
+        } else {
+            wallDelta
+        }
         if (delta <= 0L) return null
         val all = loadAll(context).toMutableMap()
         val prev = all[key] ?: PlayStats()
@@ -105,6 +144,68 @@ object PlayTimeStore {
         saveAll(context, all)
         appendSession(context, PlaySession(key, start, nowEpoch))
         return key to updated
+    }
+
+    /** Tem a permissão de acesso a dados de uso (precisa liberar no Android)? */
+    fun hasUsagePermission(context: Context): Boolean {
+        return try {
+            val appOps = context.getSystemService(AppOpsManager::class.java) ?: return false
+            val mode = if (Build.VERSION.SDK_INT >= 29) {
+                appOps.unsafeCheckOpNoThrow(
+                    AppOpsManager.OPSTR_GET_USAGE_STATS,
+                    Process.myUid(),
+                    context.packageName
+                )
+            } else {
+                @Suppress("DEPRECATION")
+                appOps.checkOpNoThrow(
+                    AppOpsManager.OPSTR_GET_USAGE_STATS,
+                    Process.myUid(),
+                    context.packageName
+                )
+            }
+            mode == AppOpsManager.MODE_ALLOWED
+        } catch (_: Exception) {
+            false
+        }
+    }
+
+    /**
+     * Millis que [packageName] passou em primeiro plano em [startMillis,
+     * endMillis], calculado dos eventos do sistema (exato na janela, sem o
+     * erro de arredondamento dos baldes diários). Null = sem permissão ou sem
+     * dados (aí vale o relógio de parede).
+     */
+    fun foregroundMillis(context: Context, packageName: String, startMillis: Long, endMillis: Long): Long? {
+        if (endMillis <= startMillis || !hasUsagePermission(context)) return null
+        return try {
+            val usm = context.getSystemService(UsageStatsManager::class.java) ?: return null
+            val events = usm.queryEvents(startMillis, endMillis)
+            var total = 0L
+            var fgStart = -1L
+            val event = UsageEvents.Event()
+            while (events.hasNextEvent()) {
+                events.getNextEvent(event)
+                if (event.packageName != packageName) continue
+                @Suppress("DEPRECATION")
+                when (event.eventType) {
+                    // MOVE_TO_* seguem entregues em todas as versões (só o
+                    // nome envelheceu); os ACTIVITY_* têm o mesmo valor.
+                    UsageEvents.Event.MOVE_TO_FOREGROUND -> fgStart = event.timeStamp
+                    UsageEvents.Event.MOVE_TO_BACKGROUND -> {
+                        if (fgStart >= 0L) {
+                            total += (event.timeStamp - fgStart).coerceAtLeast(0L)
+                            fgStart = -1L
+                        }
+                    }
+                }
+            }
+            // Ainda em primeiro plano no fim da janela: conta até o fim.
+            if (fgStart >= 0L) total += (endMillis - fgStart).coerceAtLeast(0L)
+            total
+        } catch (_: Exception) {
+            null
+        }
     }
 
     /** Últimas sessões (mais nova por último). */
@@ -166,13 +267,13 @@ object PlayTimeStore {
     }
 
     /** "hoje" / "ontem" / "há 5 dias" / "12/03/25" — última sessão. */
-    fun formatLastPlayed(epochMillis: Long, nowEpoch: Long = System.currentTimeMillis()): String {
+    fun formatLastPlayed(context: Context, epochMillis: Long, nowEpoch: Long = System.currentTimeMillis()): String {
         if (epochMillis <= 0L) return "—"
         val days = (nowEpoch - epochMillis) / 86_400_000L
         return when {
-            days < 1 -> "hoje"
-            days < 2 -> "ontem"
-            days < 30 -> "há $days dias"
+            days < 1 -> context.getString(R.string.time_today)
+            days < 2 -> context.getString(R.string.time_yesterday)
+            days < 30 -> context.getString(R.string.time_days_ago, days.toInt())
             else -> SimpleDateFormat("dd/MM/yy", Locale.getDefault()).format(Date(epochMillis))
         }
     }

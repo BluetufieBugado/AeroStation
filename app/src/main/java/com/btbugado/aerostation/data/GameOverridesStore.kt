@@ -28,7 +28,9 @@ object GameOverridesStore {
                     artUri = entry.optString("art", "").ifEmpty { null },
                     artSource = runCatching { ArtSource.valueOf(entry.optString("source", "NONE")) }
                         .getOrDefault(ArtSource.NONE),
-                    console = entry.optString("console", "").ifEmpty { null }
+                    console = entry.optString("console", "").ifEmpty { null },
+                    storeAppId = entry.optInt("storeAppId", -1).takeIf { it > 0 },
+                    storeSource = entry.optString("storeSource", "").ifEmpty { null }
                 )
             }
             result
@@ -40,13 +42,17 @@ object GameOverridesStore {
     fun save(context: Context, overrides: Map<String, GameOverride>) {
         val json = JSONObject()
         overrides.forEach { (key, override) ->
-            if (override.customName == null && override.artUri == null && override.console == null) {
+            if (override.customName == null && override.artUri == null && override.console == null &&
+                override.storeAppId == null
+            ) {
                 return@forEach
             }
             val entry = JSONObject()
             override.customName?.let { entry.put("name", it) }
             override.artUri?.let { entry.put("art", it) }
             override.console?.let { entry.put("console", it) }
+            override.storeAppId?.let { entry.put("storeAppId", it) }
+            override.storeSource?.let { entry.put("storeSource", it) }
             entry.put("source", override.artSource.name)
             json.put(key, entry)
         }

@@ -21,7 +21,7 @@ Os emuladores suportados e testados incluem:
 | Sega Genesis| Retroarch |
 | Sega CD| Não testado (em breve) |
 | MasterSystem | Não testado (em breve) |
-| Sega Saturn | Não testado |
+| Sega Saturn | Yaba Sanshiro 2 (abre a home, sem boot direto) e Retroarch |
 | N64 | Retroarch|
 | NDS | Drastic, Watermelon e SeedlessDS|
 | 3DS | Citra MMJ (opção lowend) e Azahar |
@@ -77,7 +77,9 @@ Se o aplicativo crashar uma janela deve aparecer na sua tela falando que houve u
 
 ## E jogos de PC? (Winlator/Gamehub/Gamenative/etc)
 
-Não faço ideia de como adicionar suporte a esses apps aqui, mas pretendo sim tentar em uma versão futura.
+Suporte experimental adicionado:
+- **GameNative**: boot direto pelo ID da loja (action `app.gamenative.LAUNCH_GAME`, confirmada no fonte). Como ele não abre `.exe` por intent, mapeie o jogo uma vez (segurar > Definir ID da loja) com o AppID da Steam/Epic/GOG/Amazon — o jogo precisa estar instalado nele.
+- **Winlator e GameHub**: não têm API pública de boot externo (só a home é exportada), então o app abre a home deles pra você escolher o jogo lá dentro.
 
 ## Creditos e agradecimentos
 

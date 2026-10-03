@@ -40,10 +40,12 @@ object MediaFolderStore {
     }
 
     fun add(context: Context, uri: Uri, matchNamesOnly: Boolean) {
+        // Leitura + escrita: sem escrita o apagar da galeria falha
+        // (deleteDocument exige grant de escrita na árvore).
         runCatching {
             context.contentResolver.takePersistableUriPermission(
                 uri,
-                Intent.FLAG_GRANT_READ_URI_PERMISSION
+                Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION
             )
         }
         val updated = load(context)
@@ -51,12 +53,29 @@ object MediaFolderStore {
         save(context, updated)
     }
 
+    /**
+     * Garante a escrita nas pastas já salvas (as adicionadas antes da
+     * permissão de escrita só tinham leitura). O seletor de pasta concede
+     * leitura+escrita na origem, então elevar depois funciona; best-effort.
+     */
+    fun ensureWriteAccess(context: Context) {
+        for (folder in load(context)) {
+            val uri = runCatching { Uri.parse(folder.uri) }.getOrNull() ?: continue
+            runCatching {
+                context.contentResolver.takePersistableUriPermission(
+                    uri,
+                    Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION
+                )
+            }
+        }
+    }
+
     fun remove(context: Context, uri: String) {
         save(context, load(context).filterNot { it.uri == uri })
         runCatching {
             context.contentResolver.releasePersistableUriPermission(
                 Uri.parse(uri),
-                Intent.FLAG_GRANT_READ_URI_PERMISSION
+                Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION
             )
         }
     }

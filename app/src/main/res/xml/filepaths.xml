@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Expõe só a pasta de zips de temas (cache) pro Compartilhar do sistema. -->
+<paths>
+    <cache-path name="theme-share" path="theme-share/" />
+</paths>

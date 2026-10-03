@@ -35,9 +35,11 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
+import com.btbugado.aerostation.R
 import com.btbugado.aerostation.data.RaPlayedGame
 import com.btbugado.aerostation.data.RaProfile
 import com.btbugado.aerostation.data.RaResult
@@ -104,7 +106,7 @@ fun AchievementsScreen(
                         state = AchievementsState.NetworkError
                     }
                     is RaResult.Ok -> {
-                        when (val games = RetroAchievementsApi.getRecentlyPlayed(username, apiKey)) {
+                        when (val games = RetroAchievementsApi.getRecentlyPlayed(context, username, apiKey)) {
                             is RaResult.Ok -> state = AchievementsState.Content(profile.value, games.value)
                             else -> state = AchievementsState.NetworkError
                         }
@@ -121,7 +123,7 @@ fun AchievementsScreen(
     ) {
         when (val current = state) {
             is AchievementsState.NoCredentials -> CenteredMessage(
-                "Conecte sua conta do RetroAchievements em Ajustes > Conquistas\npara ver pontos e progresso aqui."
+                stringResource(R.string.screens_achievements_connect_prompt)
             )
             is AchievementsState.Loading -> Box(
                 modifier = Modifier.fillMaxSize(),
@@ -134,10 +136,10 @@ fun AchievementsScreen(
                 verticalArrangement = Arrangement.Center,
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                CenteredMessage("Usuário ou chave de API inválidos.\nConfira em Ajustes > Conquistas.")
+                CenteredMessage(stringResource(R.string.screens_achievements_invalid_credentials))
                 Spacer(modifier = Modifier.height(16.dp))
                 SettingsItem(
-                    title = "Tentar de novo",
+                    title = stringResource(R.string.screens_achievements_retry),
                     gamepadAutoFocus = gamepadActive,
                     onClick = { refreshTick++ }
                 )
@@ -149,10 +151,10 @@ fun AchievementsScreen(
                 verticalArrangement = Arrangement.Center,
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                CenteredMessage("Não consegui falar com o RetroAchievements.\nConfira a internet e tente de novo.")
+                CenteredMessage(stringResource(R.string.screens_achievements_network_error))
                 Spacer(modifier = Modifier.height(16.dp))
                 SettingsItem(
-                    title = "Tentar de novo",
+                    title = stringResource(R.string.screens_achievements_retry),
                     gamepadAutoFocus = gamepadActive,
                     onClick = { refreshTick++ }
                 )
@@ -160,7 +162,7 @@ fun AchievementsScreen(
             is AchievementsState.Content -> {
                 if (current.games.isEmpty()) {
                     CenteredMessage(
-                        "Nenhum jogo jogado ainda.\nJogue algo com conquistas e volte aqui!"
+                        stringResource(R.string.screens_achievements_empty)
                     )
                 } else {
                     LazyColumn(
@@ -243,15 +245,15 @@ private fun ProfileHeader(profile: RaProfile, gamepadAutoFocus: Boolean) {
                 fontWeight = FontWeight.Bold
             )
             Text(
-                text = "${profile.totalPoints} pontos",
+                text = stringResource(R.string.screens_achievements_total_points, profile.totalPoints),
                 color = AeroTextPrimary,
                 fontSize = 14.sp
             )
             Text(
                 text = if (profile.rank > 0) {
-                    "Rank #${profile.rank} • ${profile.totalSoftcorePoints} casual"
+                    stringResource(R.string.screens_achievements_rank_casual, profile.rank, profile.totalSoftcorePoints)
                 } else {
-                    "${profile.totalSoftcorePoints} pontos casuais"
+                    stringResource(R.string.screens_achievements_softcore_points, profile.totalSoftcorePoints)
                 },
                 color = AeroTextSecondary,
                 fontSize = 13.sp
@@ -267,12 +269,17 @@ private fun PlayedGameRow(game: RaPlayedGame, gamepadAutoFocus: Boolean) {
     } else {
         0f
     }
+    val hardcoreSuffix = if (game.numAchievedHardcore > 0) {
+        stringResource(R.string.screens_achievements_hardcore_count_suffix, game.numAchievedHardcore)
+    } else {
+        ""
+    }
     val subtitle = buildString {
         if (game.consoleName.isNotBlank()) append(game.consoleName)
         if (game.numPossible > 0) {
             if (isNotEmpty()) append(" • ")
             append("${game.numAchieved}/${game.numPossible}")
-            if (game.numAchievedHardcore > 0) append(" (${game.numAchievedHardcore} hardcore)")
+            if (game.numAchievedHardcore > 0) append(hardcoreSuffix)
         }
         if (game.lastPlayed.isNotBlank()) {
             if (isNotEmpty()) append(" • ")

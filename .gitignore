@@ -8,6 +8,7 @@ captures/
 
 # Local SDK / signing (nunca versionar)
 local.properties
+keystore.properties
 *.jks
 *.keystore
 

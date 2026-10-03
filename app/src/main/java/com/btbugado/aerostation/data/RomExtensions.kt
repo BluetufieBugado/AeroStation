@@ -36,10 +36,14 @@ object RomExtensions {
         // Nintendo Switch (nsp/xci próprios).
         "nsp" to "Nintendo Switch",
         "xci" to "Nintendo Switch",
-        // Wii U (wud/wux/wua próprios).
+        // Wii U (wud/wux/wua/wuhb/rpx próprios; .elf é genérico demais —
+        // homebrew de PS2 também usa, então fica sem mapa e resolve por
+        // pasta/override).
         "wud" to "Wii U",
         "wux" to "Wii U",
         "wua" to "Wii U",
+        "wuhb" to "Wii U",
+        "rpx" to "Wii U",
         // GameCube / Wii (gcm/wbfs/wad próprios; ciso/gcz/rvz servem aos
         // dois no Dolphin — vão pro GameCube, corrija com Definir plataforma).
         "gcm" to "GameCube",
@@ -80,6 +84,11 @@ object RomExtensions {
         "vpk" to "PS Vita",
         // J2ME (só .jar pra não duplicar com o .jad descritor).
         "jar" to "J2ME",
+
+        // PC: o .exe aparece na biblioteca; o boot direto (GameNative)
+        // precisa do ID da loja mapeado no jogo (segurar > Definir ID da
+        // loja). Winlator/GameHub abrem a home pra boot manual.
+        "exe" to "PC",
 
         // NEC / Atari / outros clássicos
         "pce" to "PC Engine",
@@ -130,6 +139,7 @@ object RomExtensions {
         "Xbox",
         "Xbox 360",
         "Xbox One",
+        "PC",
         "J2ME",
         "PC Engine",
         "Atari 2600",
@@ -144,7 +154,7 @@ object RomExtensions {
     )
 
     /** Formatos container aceitos mesmo sem console conhecido de antemão. */
-    val containerExtensions: Set<String> = setOf("zip", "7z")
+    val containerExtensions: Set<String> = setOf("zip", "7z", "rar")
 
     /** Todas as extensões que o scanner deve considerar como possível ROM. */
     val allAcceptedExtensions: Set<String> =
@@ -153,8 +163,13 @@ object RomExtensions {
     fun consoleFor(extension: String): String? =
         consoleByExtension[extension.lowercase()]
 
-    /** Extensões cujo console NÃO dá pra saber só pelo formato. */
-    private val ambiguousExtensions = setOf("iso", "bin", "cue", "chd")
+    /**
+     * Extensões cujo console NÃO dá pra saber só pelo formato. Containers
+     * (.zip/.7z/.rar) e dumps com o mesmo formato em vários consoles
+     * (.mdf/.mds) valem pelo nome da pasta (ex: ROMs/Saturn/jogo.zip);
+     * sem pista, ficam sem console (segurar > Definir plataforma).
+     */
+    private val ambiguousExtensions = setOf("iso", "bin", "cue", "chd", "zip", "7z", "rar", "mdf", "mds")
 
     fun isAmbiguous(extension: String): Boolean =
         ambiguousExtensions.contains(extension.lowercase())

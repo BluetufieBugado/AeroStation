@@ -8,9 +8,16 @@ import android.hardware.input.InputManager
 import android.view.InputDevice
 import android.view.KeyEvent
 import android.widget.Toast
+import com.btbugado.aerostation.R
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -19,6 +26,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.selection.SelectionContainer
@@ -38,10 +46,20 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusDirection
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import com.btbugado.aerostation.ui.theme.AeroGlassBorder
+import com.btbugado.aerostation.ui.theme.AeroGlassWhite
+import com.btbugado.aerostation.ui.theme.AeroGlassWhiteStrong
+import com.btbugado.aerostation.ui.theme.AeroTextSecondary
 import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
+import androidx.compose.ui.input.nestedscroll.NestedScrollSource
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.unit.dp
@@ -50,8 +68,11 @@ import androidx.compose.ui.zIndex
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import com.btbugado.aerostation.data.AppAudio
+import com.btbugado.aerostation.data.AppTheme
+import com.btbugado.aerostation.data.ThemeEngine
 import com.btbugado.aerostation.data.ControlMode
 import com.btbugado.aerostation.data.ControlModeStore
+import com.btbugado.aerostation.data.NavBarStore
 import com.btbugado.aerostation.data.CrashReporter
 import com.btbugado.aerostation.data.PlayTimeStore
 import com.btbugado.aerostation.ui.components.DialogGamepadBar
@@ -159,8 +180,24 @@ fun RetroAeroApp() {
     // pedem pra esconder enquanto duram — sem isso a barra ficava visível
     // e tocável por cima do véu.
     var navHiddenForOverlay by remember { mutableStateOf(false) }
+    // BottomNav escondida por scroll (listas verticais: Jogados/Álbum)?
+    // Rolar pra baixo esconde, rolar pra cima mostra — ganha espaço vertical.
+    // Só vale no modo TOUCH: no modo GAMEPAD a barra precisa continuar
+    // focável, senão o cursor perde o alvo no meio da navegação.
+    var navHiddenForScroll by remember { mutableStateOf(false) }
+    // BottomNav escondida MANUALMENTE (segurar o fundo no modo touch).
+    // Sessão apenas: troca de aba e modo controle sempre mostram de volta,
+    // pra nunca strandar o usuário sem navegação.
+    var navHiddenManual by remember { mutableStateOf(false) }
+    // Auto-hide no scroll ligado? (Ajustes > Geral; padrão ligado.)
+    var navAutoHide by remember { mutableStateOf(NavBarStore.isAutoHideEnabled(context)) }
     // Pad virtual escondido? O viewer de mídia da galeria pede enquanto aberto.
     var padHiddenForOverlay by remember { mutableStateOf(false) }
+    // Editor de tema em tela cheia (Ajustes > Temas > Novo/Editar): tema +
+    // se é novo. Enquanto aberto, cobre tudo (sem painel, sem nav, sem pad).
+    var themeEditorRequest by remember { mutableStateOf<Pair<AppTheme, Boolean>?>(null) }
+    // Incrementado ao fechar o editor: a lista de temas recarrega.
+    var themeEditorClosedTick by remember { mutableStateOf(0) }
     // Override do D-pad virtual (ex: viewer de vídeo usa ←/→ pra seek):
     // quem ativa escreve aqui, o handler da janela consome.
     val dpadOverride = remember { mutableStateOf<((FocusDirection) -> Boolean)?>(null) }
@@ -218,6 +255,8 @@ fun RetroAeroApp() {
     // Áudio: prepara efeitos + música uma vez; pausa a música ao sair do
     // app (ex: emulador por cima) e volta ao retornar.
     LaunchedEffect(Unit) {
+        // Tema ativo ANTES do áudio: o init já carrega bgm/sfx do tema.
+        ThemeEngine.init(context)
         withContext(Dispatchers.IO) { AppAudio.init(context) }
         // Crash da sessão anterior? Mostra o dialog de envio (sem logcat).
         crashFile = CrashReporter.pendingCrashes(context).firstOrNull()
@@ -257,6 +296,9 @@ fun RetroAeroApp() {
     // solta qualquer foco preso e apaga o retângulo do cursor. Sem isso o
     // contorno branco ficava parado num elemento no modo touch.
     LaunchedEffect(gamepadUiEnabled) {
+        // No modo controle a barra é alvo de foco: nunca fica escondida
+        // manualmente (o gesto só vale no touch).
+        if (gamepadUiEnabled) navHiddenManual = false
         if (!gamepadUiEnabled) {
             gamepadCursor.clearAll()
             focusManager.clearFocus(force = true)
@@ -285,9 +327,12 @@ fun RetroAeroApp() {
         focusManager.clearFocus(force = true)
         // Teto de segurança: nenhum overlay sobrevive à troca de aba, então
         // a nav e o pad nunca ficam escondidos pra sempre (ex: L1/R1 no meio
-        // do preview ou do viewer).
+        // do preview ou do viewer). O editor de tema fecha junto.
         navHiddenForOverlay = false
         padHiddenForOverlay = false
+        navHiddenForScroll = false
+        navHiddenManual = false
+        themeEditorRequest = null
         currentScreen = screen
     }
 
@@ -343,11 +388,45 @@ fun RetroAeroApp() {
         LocalTouchActionsEnabled provides touchActionsEnabled,
         LocalVirtualPadVisible provides virtualPadVisible,
         LocalHideNavForOverlay provides { hidden: Boolean -> navHiddenForOverlay = hidden },
-        LocalHidePadForOverlay provides { hidden: Boolean -> padHiddenForOverlay = hidden }
+        LocalHidePadForOverlay provides { hidden: Boolean -> padHiddenForOverlay = hidden },
+        LocalOpenThemeEditor provides { theme: AppTheme, isNew: Boolean ->
+            themeEditorRequest = theme to isNew
+        },
+        LocalThemeEditorClosedTick provides themeEditorClosedTick
     ) {
+        // Auto-hide da BottomNav no scroll (só TOUCH e com a chave ligada:
+        // no GAMEPAD ela é alvo de foco e sumir no meio da navegação
+        // strandaria o cursor). Rolar pra baixo (available.y < 0) esconde,
+        // pra cima mostra. Histerese de 10px: evita liga/desliga com o
+        // jitter do dedo parado.
+        val scrollHideConnection = remember(gamepadUiEnabled, navAutoHide) {
+            object : NestedScrollConnection {
+                override fun onPreScroll(
+                    available: Offset,
+                    source: NestedScrollSource
+                ): Offset {
+                    if (gamepadUiEnabled || !navAutoHide) return Offset.Zero
+                    if (available.y < -10f) {
+                        if (!navHiddenForScroll) navHiddenForScroll = true
+                    } else if (available.y > 10f) {
+                        if (navHiddenForScroll) navHiddenForScroll = false
+                    }
+                    return Offset.Zero
+                }
+            }
+        }
+        val navVisible = !navHiddenForOverlay && !navHiddenManual &&
+            !(navHiddenForScroll && navAutoHide && !gamepadUiEnabled)
+        // Troca SECA do respiro (sem animateDpAsState): animar o padding
+        // recompunha a lista inteira a cada frame — era o lag do swipe.
+        // O deslize da barra continua animado (só a barra, baratinho).
+        // Com a barra escondida manualmente a alça flutua embaixo, então o
+        // respiro é um pouco maior que o vazio total.
+        val bottomClearance = if (navVisible) BottomBarClearance else 34.dp
         Box(
             modifier = Modifier
                 .fillMaxSize()
+                .nestedScroll(scrollHideConnection)
                 // Toque em conteúdo = "quero o pad virtual de volta": mostra
                 // o pad e esconde o cursor até o próximo input de controle.
                 // requireUnconsumed=true: toques nos botões do próprio pad
@@ -401,7 +480,7 @@ fun RetroAeroApp() {
         ) {
             AeroBackground(modifier = Modifier.fillMaxSize())
 
-            val screenContentPadding = PaddingValues(bottom = BottomBarClearance)
+            val screenContentPadding = PaddingValues(bottom = bottomClearance)
 
             // Handler do D-pad virtual para a janela principal (dialogs têm
             // o próprio dentro de GamepadDialogScope).
@@ -416,6 +495,12 @@ fun RetroAeroApp() {
             // Agora existe uma única árvore interativa por vez. Os dados pesados
             // continuam protegidos por LauncherContentCache/Stores e a troca
             // continua sendo instantânea, pois não há animação nem espera.
+            //
+            // Com o editor de tema aberto, NEM a página vai: ela sai da
+            // composição (igual a grade da galeria atrás do viewer) — sem
+            // botões "fantasma" por baixo do overlay e sem custo de compor
+            // duas telas pesadas juntas.
+            if (themeEditorRequest == null) {
             when (currentScreen) {
                 AppScreen.HOME -> {
                     HomeScreen(
@@ -460,12 +545,38 @@ fun RetroAeroApp() {
                         gamepadActive = gamepadUiEnabled,
                         controlMode = controlMode,
                         onControlModeChange = ::setControlMode,
-                        onEditPadLayout = { editingPad = true }
+                        onEditPadLayout = { editingPad = true },
+                        navAutoHide = navAutoHide,
+                        onNavAutoHideChange = {
+                            navAutoHide = it
+                            NavBarStore.setAutoHideEnabled(context, it)
+                        }
                     )
                 }
             }
+            } else {
+                // Editor aberto: página fora da composição (ver comentário).
+                Spacer(modifier = Modifier.fillMaxSize())
+            }
 
             GamepadCursorOverlay(modifier = Modifier.zIndex(100f))
+
+            // Editor de tema em tela cheia (sem painel, sem nav, sem pad):
+            // abaixo do cursor (z100) pra ele continuar visível no controle,
+            // acima do conteúdo. Voltar/Salvar devolvem pra lista de temas.
+            themeEditorRequest?.let { (theme, isNew) ->
+                ThemeEditorOverlay(
+                    initial = theme,
+                    isNew = isNew,
+                    gamepadActive = gamepadUiEnabled,
+                    onClose = { saved ->
+                        if (saved) ThemeEngine.refresh(context)
+                        themeEditorRequest = null
+                        themeEditorClosedTick++
+                    },
+                    modifier = Modifier.zIndex(50f)
+                )
+            }
 
             // Pad virtual some enquanto o físico está em uso, ao tocar na
             // tela ele volta (virtualPadVisible) e no viewer de mídia
@@ -498,7 +609,33 @@ fun RetroAeroApp() {
 
             // Fora de cena durante overlays fullscreen (preview/inserção):
             // nem visível, nem tocável, nem focável pelo controle.
-            if (!navHiddenForOverlay) {
+            // Fora isso, some no scroll pra baixo (modo touch) e volta no
+            // scroll pra cima — seco, SEM animação: qualquer animação aqui
+            // roda junto do scroll e engasga em aparelho fraco. O ganho de
+            // espaço (~70dp) continua valendo. A alça acima da barra alterna
+            // manualmente (só touch); no controle a barra fica sempre.
+            if (!navHiddenForOverlay && !gamepadUiEnabled) {
+                Column(
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .padding(bottom = 14.dp)
+                        .zIndex(10f),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    NavHandle(
+                        expanded = navVisible,
+                        onToggle = { navHiddenManual = !navHiddenManual },
+                        touchOk = touchActionsEnabled
+                    )
+                    if (navVisible) {
+                        Spacer(modifier = Modifier.height(6.dp))
+                        BottomNavBar(
+                            current = currentScreen,
+                            onSelect = { switchScreen(it) }
+                        )
+                    }
+                }
+            } else if (navVisible) {
                 BottomNavBar(
                     current = currentScreen,
                     onSelect = { switchScreen(it) },
@@ -528,6 +665,41 @@ fun RetroAeroApp() {
 }
 
 /**
+ * Alça sutil acima da BottomNav: pílula de vidro com setinha que alterna a
+ * barra (mostra/esconde). De propósito discreta — some junto nos overlays
+ * fullscreen e nem existe no modo controle (lá a barra é alvo de foco).
+ */
+@Composable
+private fun NavHandle(
+    expanded: Boolean,
+    onToggle: () -> Unit,
+    touchOk: Boolean
+) {
+    val desc = stringResource(R.string.nav_toggle_desc)
+    Box(
+        modifier = Modifier
+            .size(width = 64.dp, height = 16.dp)
+            .clip(RoundedCornerShape(50))
+            .background(Brush.linearGradient(listOf(AeroGlassWhiteStrong, AeroGlassWhite)))
+            .border(1.dp, AeroGlassBorder, RoundedCornerShape(50))
+            .semantics { contentDescription = desc }
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null,
+                role = Role.Button,
+                onClick = { if (touchOk) onToggle() }
+            ),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            text = if (expanded) "▼" else "▲",
+            color = AeroTextSecondary,
+            fontSize = 9.sp
+        )
+    }
+}
+
+/**
  * Dialog do log de crash: mostra o stack trace (rolável, selecionável) com
  * Compartilhar (manda o texto completo pra qualquer app) e Copiar.
  * Dentro de [GamepadDialogScope] pra funcionar no controle também.
@@ -541,15 +713,16 @@ private fun CrashReportDialog(
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val content = remember(file) { CrashReporter.readCrash(file) }
+    val context = LocalContext.current
+    val content = remember(file) { CrashReporter.readCrash(context, file) }
     GamepadDialogScope {
         AlertDialog(
             onDismissRequest = onDismiss,
-            title = { Text("O app fechou sozinho 😅") },
+            title = { Text(stringResource(R.string.screens_crash_dialog_title)) },
             text = {
                 Column {
                     Text(
-                        text = "Grabei o erro da última vez (${file.name}). Me manda o log que eu conserto rapidinho — ele reaparece ao reabrir até você apagar.",
+                        text = stringResource(R.string.screens_crash_dialog_message, file.name),
                         fontSize = 13.sp
                     )
                     Spacer(modifier = Modifier.height(8.dp))
@@ -576,18 +749,18 @@ private fun CrashReportDialog(
                 TextButton(
                     onClick = onShare,
                     modifier = Modifier.gamepadFocusable(autoFocus = true, onConfirm = onShare)
-                ) { Text("Compartilhar") }
+                ) { Text(stringResource(R.string.common_share)) }
             },
             dismissButton = {
                 Row {
                     TextButton(
                         onClick = onCopy,
                         modifier = Modifier.gamepadFocusable(onConfirm = onCopy)
-                    ) { Text("Copiar") }
+                    ) { Text(stringResource(R.string.common_copy)) }
                     TextButton(
                         onClick = onDelete,
                         modifier = Modifier.gamepadFocusable(onConfirm = onDelete, onBack = onDismiss)
-                    ) { Text("Apagar") }
+                    ) { Text(stringResource(R.string.common_delete)) }
                 }
             },
             shape = RoundedCornerShape(20.dp),
@@ -600,19 +773,19 @@ private fun shareCrash(context: Context, file: File) {
     val intent = Intent(Intent.ACTION_SEND).apply {
         type = "text/plain"
         putExtra(Intent.EXTRA_SUBJECT, "AeroStation ${file.name}")
-        putExtra(Intent.EXTRA_TEXT, CrashReporter.readCrash(file))
+        putExtra(Intent.EXTRA_TEXT, CrashReporter.readCrash(context, file))
     }
     runCatching {
-        context.startActivity(Intent.createChooser(intent, "Enviar log do crash"))
+        context.startActivity(Intent.createChooser(intent, context.getString(R.string.screens_crash_chooser_title)))
     }.onFailure {
-        Toast.makeText(context, "Não consegui abrir o compartilhamento", Toast.LENGTH_SHORT).show()
+        Toast.makeText(context, context.getString(R.string.common_share_failed), Toast.LENGTH_SHORT).show()
     }
 }
 
 private fun copyCrash(context: Context, file: File) {
-    val clip = ClipData.newPlainText("AeroStation crash", CrashReporter.readCrash(file))
+    val clip = ClipData.newPlainText("AeroStation crash", CrashReporter.readCrash(context, file))
     runCatching {
         context.getSystemService(ClipboardManager::class.java)?.setPrimaryClip(clip)
     }
-    Toast.makeText(context, "Log copiado! Me manda onde preferir.", Toast.LENGTH_SHORT).show()
+    Toast.makeText(context, context.getString(R.string.screens_crash_copied_toast), Toast.LENGTH_SHORT).show()
 }

@@ -27,6 +27,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Text
+import androidx.compose.ui.res.stringResource
+import com.btbugado.aerostation.R
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.compositionLocalOf
@@ -44,6 +46,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
+import com.btbugado.aerostation.data.AppAudio
 import com.btbugado.aerostation.ui.theme.AeroGlassBorder
 import com.btbugado.aerostation.ui.theme.AeroGlassWhite
 import com.btbugado.aerostation.ui.theme.AeroGlassWhiteStrong
@@ -259,16 +262,18 @@ fun CartridgePreviewDialog(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 WiiPillButton(
-                    label = "Voltar",
+                    label = stringResource(R.string.screens_preview_back),
                     primary = false,
                     autoFocus = false,
-                    onClick = { if (touchOk) onDismiss() },
-                    onConfirm = onDismiss,
+                    // Voltar FECHA o preview: som de fechar, não de confirmar.
+                    confirmSound = false,
+                    onClick = { if (touchOk) { AppAudio.playClose(); onDismiss() } },
+                    onConfirm = { AppAudio.playClose(); onDismiss() },
                     onBack = onDismiss
                 )
                 Spacer(modifier = Modifier.width(18.dp))
                 WiiPillButton(
-                    label = "Jogar",
+                    label = stringResource(R.string.screens_preview_play),
                     primary = true,
                     autoFocus = true,
                     onClick = { if (touchOk) onConfirm() },
@@ -291,6 +296,7 @@ private fun WiiPillButton(
     onClick: () -> Unit,
     onConfirm: () -> Unit,
     onBack: () -> Unit,
+    confirmSound: Boolean = true,
     modifier: Modifier = Modifier
 ) {
     Box(
@@ -312,7 +318,8 @@ private fun WiiPillButton(
             .gamepadFocusable(
                 autoFocus = autoFocus,
                 onConfirm = onConfirm,
-                onBack = onBack
+                onBack = onBack,
+                playConfirmSound = confirmSound
             )
             .clickable(
                 interactionSource = remember { MutableInteractionSource() },

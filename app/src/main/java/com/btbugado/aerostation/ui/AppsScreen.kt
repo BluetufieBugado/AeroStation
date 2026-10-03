@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.gestures.animateScrollBy
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
@@ -26,12 +27,16 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.core.graphics.drawable.toBitmap
+import com.btbugado.aerostation.R
 import com.btbugado.aerostation.data.LauncherContentCache
 import com.btbugado.aerostation.ui.components.AppIconCard
 import com.btbugado.aerostation.ui.theme.AeroTextSecondary
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -52,6 +57,9 @@ fun AppsScreen(contentPadding: PaddingValues = PaddingValues(), gamepadActive: B
     val scope = rememberCoroutineScope()
     // Mesmo snap da Home: focar o primeiro app recentraliza a fila no recuo.
     val rowState = rememberLazyListState()
+    // Espelho do último da Home: empurra o respiro do fim pra vista.
+    var focusedAppIndex by remember { mutableStateOf<Int?>(null) }
+    val trailingPadPx = with(LocalDensity.current) { 96.dp.toPx() }
 
     LaunchedEffect(Unit) {
         val cached = LauncherContentCache.getApps()
@@ -86,7 +94,7 @@ fun AppsScreen(contentPadding: PaddingValues = PaddingValues(), gamepadActive: B
 
         currentApps.isEmpty() -> {
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Text(text = "Nenhum app encontrado.", color = AeroTextSecondary)
+                Text(text = stringResource(R.string.screens_apps_empty), color = AeroTextSecondary)
             }
         }
 
@@ -95,8 +103,9 @@ fun AppsScreen(contentPadding: PaddingValues = PaddingValues(), gamepadActive: B
                 state = rowState,
                 contentPadding = PaddingValues(
                     // Mesmo enquadramento da Home (fila começa aos 76dp).
+                    // Fim generoso igual: último ícone longe da borda.
                     start = 76.dp,
-                    end = 32.dp,
+                    end = 96.dp,
                     top = contentPadding.calculateTopPadding(),
                     bottom = contentPadding.calculateBottomPadding()
                 ),
@@ -110,9 +119,19 @@ fun AppsScreen(contentPadding: PaddingValues = PaddingValues(), gamepadActive: B
                         icon = app.icon,
                         modifier = Modifier.width(AppIconWidth),
                         gamepadAutoFocus = gamepadActive && index == 0,
-                        onFocusGained = if (index == 0) {
-                            { scope.launch { rowState.animateScrollToItem(0) } }
-                        } else null,
+                        onFocusGained = {
+                            focusedAppIndex = index
+                            if (index == 0) {
+                                scope.launch { rowState.animateScrollToItem(0) }
+                            } else if (index == currentApps.lastIndex) {
+                                scope.launch {
+                                    delay(150)
+                                    if (focusedAppIndex == currentApps.lastIndex) {
+                                        rowState.animateScrollBy(trailingPadPx)
+                                    }
+                                }
+                            }
+                        },
                         onClick = {
                             val launchIntent = context.packageManager.getLaunchIntentForPackage(app.packageName)
                             if (launchIntent != null) {

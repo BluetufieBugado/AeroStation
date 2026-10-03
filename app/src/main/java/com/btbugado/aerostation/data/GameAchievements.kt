@@ -1,6 +1,7 @@
 package com.btbugado.aerostation.data
 
 import android.content.Context
+import com.btbugado.aerostation.R
 import android.net.Uri
 import androidx.documentfile.provider.DocumentFile
 import kotlinx.coroutines.Dispatchers
@@ -83,7 +84,7 @@ object GameAchievements {
             // sai do cache pra sempre.
             hashForGame(context, gameUri, extension)?.let { md5 ->
                 dbg += "hash=$md5"
-                gameFromHash(username, apiKey, md5)?.let { game ->
+                gameFromHash(context, username, apiKey, md5)?.let { game ->
                     dbg += "hashGame=${game.first}"
                     progressWithDebug(context, username, apiKey, game.first, game.second, dbg)
                         ?.let { return@withContext it }
@@ -136,7 +137,7 @@ object GameAchievements {
      * comprimidos/próprios: o RA hasheia o conteúdo descomprimido). Essas
      * pulam direto pro fallback por título.
      */
-    private val unhashableExtensions = setOf("chd", "cso", "gdi", "cdi", "m3u", "zip", "7z")
+    private val unhashableExtensions = setOf("chd", "cso", "gdi", "cdi", "m3u", "zip", "7z", "rar", "mdf", "mds")
 
     /** MD5 em hex com cache (validado pelo tamanho do arquivo). */
     private fun hashForGame(context: Context, gameUri: Uri, extension: String): String? {
@@ -199,13 +200,13 @@ object GameAchievements {
     }
 
     /** Resolve o hash no RA. 404/sem ID = hash desconhecido (jogo sem suporte). */
-    private fun gameFromHash(username: String, apiKey: String, md5: String): Pair<Int, String>? {
+    private fun gameFromHash(context: Context, username: String, apiKey: String, md5: String): Pair<Int, String>? {
         val json = getObject(
             "API_GetGameFromHash.php?z=${encode(username)}&y=${encode(apiKey)}&h=$md5"
         ) ?: return null
         val id = json.optInt("ID", 0)
         if (id == 0) return null
-        return id to json.optString("Title", "Jogo $id")
+        return id to json.optString("Title", context.getString(R.string.screens_ra_game_fallback_title, id))
     }
 
     // Consoles RA.

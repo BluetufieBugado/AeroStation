@@ -2,6 +2,7 @@ package com.btbugado.aerostation.data
 
 import android.content.Context
 import android.os.Build
+import com.btbugado.aerostation.R
 import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -73,8 +74,9 @@ object CrashReporter {
                 .orEmpty()
         }.getOrDefault(emptyList())
 
-    fun readCrash(file: File, maxChars: Int = 60_000): String =
-        runCatching { file.readText().take(maxChars) }.getOrDefault("Não consegui ler o arquivo.")
+    fun readCrash(context: Context, file: File, maxChars: Int = 60_000): String =
+        runCatching { file.readText().take(maxChars) }
+            .getOrDefault(context.getString(R.string.crash_log_read_failed))
 
     fun deleteCrash(file: File) {
         runCatching { file.delete() }

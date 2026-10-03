@@ -15,7 +15,9 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import com.btbugado.aerostation.R
 
 /**
  * Menu que aparece ao segurar o dedo num ícone de jogo (long-press),
@@ -35,7 +37,8 @@ fun GameActionMenu(
     onAutoFetchCover: () -> Unit,
     onPickConsole: () -> Unit,
     onResetToDefault: () -> Unit,
-    onRemoveAndroidApp: (() -> Unit)? = null
+    onRemoveAndroidApp: (() -> Unit)? = null,
+    onPickStoreId: (() -> Unit)? = null
 ) {
     GamepadDialogScope {
         AlertDialog(
@@ -50,13 +53,14 @@ fun GameActionMenu(
                         .heightIn(max = 320.dp)
                         .verticalScroll(rememberScrollState())
                 ) {
-                    MenuAction("Renomear", onRename, autoFocus = true, onBack = onDismiss)
-                    MenuAction("Escolher capa da galeria", onPickFromGallery, onBack = onDismiss)
-                    MenuAction("Pesquisar no SteamGridDB", onSearchSteamGridDb, onBack = onDismiss)
-                    MenuAction("Buscar capa automaticamente", onAutoFetchCover, onBack = onDismiss)
-                    MenuAction("Definir plataforma", onPickConsole, onBack = onDismiss)
-                    MenuAction("Restaurar padrão", onResetToDefault, onBack = onDismiss)
-                    onRemoveAndroidApp?.let { MenuAction("Remover da tela inicial", it, onBack = onDismiss) }
+                    MenuAction(stringResource(R.string.screens_game_menu_rename), onRename, autoFocus = true, onBack = onDismiss)
+                    MenuAction(stringResource(R.string.screens_game_menu_choose_cover), onPickFromGallery, onBack = onDismiss)
+                    MenuAction(stringResource(R.string.screens_game_menu_search_steamgriddb), onSearchSteamGridDb, onBack = onDismiss)
+                    MenuAction(stringResource(R.string.screens_game_menu_auto_fetch_cover), onAutoFetchCover, onBack = onDismiss)
+                    MenuAction(stringResource(R.string.screens_game_menu_set_platform), onPickConsole, onBack = onDismiss)
+                    onPickStoreId?.let { MenuAction(stringResource(R.string.screens_game_menu_set_store_id), it, onBack = onDismiss) }
+                    MenuAction(stringResource(R.string.screens_game_menu_restore_default), onResetToDefault, onBack = onDismiss)
+                    onRemoveAndroidApp?.let { MenuAction(stringResource(R.string.screens_game_menu_remove_from_home), it, onBack = onDismiss) }
                 }
             },
             confirmButton = {
@@ -68,7 +72,7 @@ fun GameActionMenu(
                     TextButton(
                         onClick = onDismiss,
                         modifier = Modifier.gamepadFocusable(onConfirm = onDismiss, onBack = onDismiss)
-                    ) { Text("Fechar") }
+                    ) { Text(stringResource(R.string.common_close)) }
                 }
             }
         )
@@ -110,7 +114,7 @@ fun RenameGameDialog(
     GamepadDialogScope {
         AlertDialog(
             onDismissRequest = onDismiss,
-            title = { Text("Renomear jogo") },
+            title = { Text(stringResource(R.string.screens_rename_dialog_title)) },
             text = {
                 Column {
                     OutlinedTextField(
@@ -131,14 +135,14 @@ fun RenameGameDialog(
                         onBack = onDismiss
                     )
                 ) {
-                    Text("Salvar")
+                    Text(stringResource(R.string.common_save))
                 }
             },
             dismissButton = {
                 TextButton(
                     onClick = onDismiss,
                     modifier = Modifier.gamepadFocusable(onConfirm = onDismiss, onBack = onDismiss)
-                ) { Text("Cancelar") }
+                ) { Text(stringResource(R.string.common_cancel)) }
             }
         )
     }

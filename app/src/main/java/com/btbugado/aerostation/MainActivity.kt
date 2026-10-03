@@ -1,5 +1,6 @@
 package com.btbugado.aerostation
 
+import android.content.Context
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -8,10 +9,15 @@ import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import com.btbugado.aerostation.data.CrashReporter
+import com.btbugado.aerostation.data.LanguageStore
 import com.btbugado.aerostation.ui.RetroAeroApp
 import com.btbugado.aerostation.ui.theme.RetroAeroTheme
 
 class MainActivity : ComponentActivity() {
+    override fun attachBaseContext(newBase: Context) {
+        super.attachBaseContext(LanguageStore.wrap(newBase))
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         // Primeiro de tudo: gravador de crash (antes do Compose existir).

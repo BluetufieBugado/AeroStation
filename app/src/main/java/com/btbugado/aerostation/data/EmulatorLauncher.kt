@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.widget.Toast
+import com.btbugado.aerostation.R
 
 object EmulatorLauncher {
     fun launch(context: Context, game: Game) {
@@ -14,7 +15,7 @@ object EmulatorLauncher {
             GameOverridesStore.load(context)[game.uri.toString()]?.console
         }.getOrNull() ?: game.console
         if (console == null) {
-            Toast.makeText(context, "Não consegui identificar o console desse jogo.", Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, context.getString(R.string.boot_toast_no_console), Toast.LENGTH_SHORT).show()
             return
         }
 
@@ -33,7 +34,7 @@ object EmulatorLauncher {
         if (target == null) {
             Toast.makeText(
                 context,
-                "Nenhum emulador configurado para $console.\nAbra Configurações > Emuladores.",
+                context.getString(R.string.boot_toast_no_emulator, console),
                 Toast.LENGTH_LONG
             ).show()
             return
@@ -46,7 +47,7 @@ object EmulatorLauncher {
         // salva na configuração seja outra/antiga.
         EmulatorRegistry.customBootIntent(game, target, console)?.let { custom ->
             if (runCatching { context.startActivity(custom) }.isSuccess) {
-                PlayTimeStore.beginSession(context, game.uri.toString())
+                PlayTimeStore.beginSession(context, game.uri.toString(), target.packageName)
                 return
             }
             // Falhou: segue pras tentativas VIEW/fallback abaixo.
@@ -57,7 +58,7 @@ object EmulatorLauncher {
         // na home com aviso.
         if (EmulatorRegistry.isCitraPackage(target.packageName)) {
             if (tryCitraBoot(context, game, target)) {
-                PlayTimeStore.beginSession(context, game.uri.toString())
+                PlayTimeStore.beginSession(context, game.uri.toString(), target.packageName)
                 return
             }
             // Falhou: segue pro VIEW genérico/home abaixo.
@@ -67,7 +68,7 @@ object EmulatorLauncher {
         // URI como dado e abre a lista de jogos) — por isso tenta antes.
         if (EmulatorRegistry.isDolphinPackage(target.packageName)) {
             if (tryDolphinBoot(context, game, target)) {
-                PlayTimeStore.beginSession(context, game.uri.toString())
+                PlayTimeStore.beginSession(context, game.uri.toString(), target.packageName)
                 return
             }
             // Falhou: segue pro VIEW genérico/home abaixo.
@@ -79,18 +80,68 @@ object EmulatorLauncher {
         if (console == "PS Vita" && !EmulatorRegistry.isRetroArchPackage(target.packageName)) {
             val titleId = VitaTitleId.resolve(context, game)
             if (titleId != null && tryVita3KBoot(context, game, target, titleId)) {
-                PlayTimeStore.beginSession(context, game.uri.toString())
+                PlayTimeStore.beginSession(context, game.uri.toString(), target.packageName)
                 return
             }
             if (titleId == null) {
                 Toast.makeText(
                     context,
-                    "Não encontrei o Title ID desse jogo (ex: PCSB00245).\nInstale o .vpk dentro do Vita3K e abra por lá.",
+                    context.getString(R.string.boot_toast_no_title_id),
                     Toast.LENGTH_LONG
                 ).show()
             }
             if (openEmulatorHome(context, target)) {
-                PlayTimeStore.beginSession(context, game.uri.toString())
+                PlayTimeStore.beginSession(context, game.uri.toString(), target.packageName)
+            }
+            return
+        }
+        // PC (jogos de Windows no Android): GameNative boota pelo ID da loja
+        // (mapeado no jogo); Winlator/GameHub não têm API de boot externo e
+        // abrem a home pro boot manual. Vale pra qualquer app configurado pro
+        // console, não só pros da tabela.
+        if (console == "PC") {
+            if (EmulatorRegistry.isGameNativePackage(target.packageName)) {
+                val override = GameOverridesStore.load(context)[game.uri.toString()]
+                val appId = override?.storeAppId
+                if (appId != null && tryGameNativeBoot(context, target, appId, override.storeSource)) {
+                    PlayTimeStore.beginSession(context, game.uri.toString(), target.packageName)
+                    return
+                }
+                if (appId == null) {
+                    Toast.makeText(
+                        context,
+                        context.getString(R.string.boot_toast_no_store_id),
+                        Toast.LENGTH_LONG
+                    ).show()
+                }
+                if (openEmulatorHome(context, target)) {
+                    PlayTimeStore.beginSession(context, game.uri.toString(), target.packageName)
+                }
+                return
+            }
+            if (EmulatorRegistry.isPcHomeOnlyPackage(target.packageName)) {
+                Toast.makeText(
+                    context,
+                    context.getString(R.string.boot_toast_home_only, target.displayName),
+                    Toast.LENGTH_LONG
+                ).show()
+                if (openEmulatorHome(context, target)) {
+                    PlayTimeStore.beginSession(context, game.uri.toString(), target.packageName)
+                }
+                return
+            }
+        }
+        // Saturn no Yaba Sanshiro 2: sem boot externo confiável, abre a
+        // home pro boot manual. Pelo RetroArch (core yabause) o boot direto
+        // segue o fluxo normal abaixo.
+        if (console == "Saturn" && EmulatorRegistry.isYabaPackage(target.packageName)) {
+            Toast.makeText(
+                context,
+                context.getString(R.string.boot_toast_home_only, target.displayName),
+                Toast.LENGTH_LONG
+            ).show()
+            if (openEmulatorHome(context, target)) {
+                PlayTimeStore.beginSession(context, game.uri.toString(), target.packageName)
             }
             return
         }
@@ -103,30 +154,51 @@ object EmulatorLauncher {
                 ?: EmulatorRegistry.coreFor(console, target.packageName)
             val path = EmulatorRegistry.realPathFromTreeUri(game.uri)
             val why = when {
-                core == null -> "sem núcleo mapeado para $console no RetroArch"
-                path == null -> "não consegui ler o caminho do jogo (use pasta na memória interna)"
-                else -> "falha ao enviar o jogo (confira o núcleo em Online Updater)"
+                core == null -> context.getString(R.string.boot_retroarch_why_no_core, console)
+                path == null -> context.getString(R.string.boot_retroarch_why_no_path)
+                else -> context.getString(R.string.boot_retroarch_why_generic)
             }
             Toast.makeText(
                 context,
-                "RetroArch: $why.\nNúcleo esperado: ${core ?: "?"}\nBaixe-o no RetroArch > Online Updater e dê acesso total aos arquivos.",
+                context.getString(R.string.boot_toast_retroarch, why, core ?: "?"),
                 Toast.LENGTH_LONG
             ).show()
             if (openEmulatorHome(context, target)) {
-                PlayTimeStore.beginSession(context, game.uri.toString())
+                PlayTimeStore.beginSession(context, game.uri.toString(), target.packageName)
             }
             return
+        }
+        // ARMSX2 (GitHub/Play): boot direto via ACTION_VIEW sem mimeType
+        // (.BootSplashActivity > .MainActivity > .Main), com .cue resolvido
+        // pra .bin. O VIEW genérico abaixo também abriria a activity, mas sem
+        // a resolução de .cue e sem a ordem de activities certa.
+        if (EmulatorRegistry.isArmsx2Package(target.packageName)) {
+            if (tryArmsx2Boot(context, game, target)) {
+                PlayTimeStore.beginSession(context, game.uri.toString(), target.packageName)
+                return
+            }
+            // Falhou: segue pro VIEW genérico/home abaixo.
+        }
+        // Cemu (Wii U): boot direto via ACTION_VIEW + "*/*" na
+        // EmulationActivity. Sem isso caía no VIEW genérico, que varia o MIME
+        // e pode tentar sem tipo (nunca casa no filtro do Cemu).
+        if (EmulatorRegistry.isCemuPackage(target.packageName)) {
+            if (tryCemuBoot(context, game, target)) {
+                PlayTimeStore.beginSession(context, game.uri.toString(), target.packageName)
+                return
+            }
+            // Falhou: segue pro VIEW genérico/home abaixo.
         }
         // VIEW em cascata (o tryView já varia MIME específico, genérico e
         // sem tipo): cobre filtros exigentes e os que só declaram scheme.
         if (tryView(context, game, target, mimeFor(game.extension))) {
-            PlayTimeStore.beginSession(context, game.uri.toString())
+            PlayTimeStore.beginSession(context, game.uri.toString(), target.packageName)
             return
         }
         // Último recurso: abre o emulador pra escolher o jogo lá dentro,
         // em vez de terminar num erro sem saída.
         if (openEmulatorHome(context, target)) {
-            PlayTimeStore.beginSession(context, game.uri.toString())
+            PlayTimeStore.beginSession(context, game.uri.toString(), target.packageName)
         }
     }
 
@@ -180,6 +252,70 @@ object EmulatorLauncher {
                 return true
             } catch (_: ActivityNotFoundException) {
                 // Tenta a próxima variante de activity.
+            } catch (_: SecurityException) {
+                // Activity existe mas não é exportada nesse build.
+            }
+        }
+        return false
+    }
+
+    /**
+     * Boot direto no ARMSX2: tenta cada intent candidata em ordem; a
+     * primeira que abrir vence. Falhas (activity inexistente no build,
+     * não-exportada) só passam pra próxima tentativa.
+     */
+    private fun tryArmsx2Boot(context: Context, game: Game, target: EmulatorTarget): Boolean {
+        for (intent in EmulatorRegistry.armsx2BootIntents(context, game, target)) {
+            try {
+                context.startActivity(intent)
+                return true
+            } catch (_: ActivityNotFoundException) {
+                // Tenta a próxima variante de activity.
+            } catch (_: SecurityException) {
+                // Activity existe mas não é exportada nesse build.
+            }
+        }
+        return false
+    }
+
+    /**
+     * Boot direto no Cemu: tenta cada intent candidata em ordem; a
+     * primeira que abrir vence. Falhas (activity inexistente no build,
+     * não-exportada) só passam pra próxima tentativa.
+     */
+    private fun tryCemuBoot(context: Context, game: Game, target: EmulatorTarget): Boolean {
+        for (intent in EmulatorRegistry.cemuBootIntents(game, target)) {
+            try {
+                context.startActivity(intent)
+                return true
+            } catch (_: ActivityNotFoundException) {
+                // Tenta a próxima variante de activity.
+            } catch (_: SecurityException) {
+                // Activity existe mas não é exportada nesse build.
+            }
+        }
+        return false
+    }
+
+    /**
+     * Boot direto no GameNative pelo ID da loja: action própria primeiro,
+     * deep link de reserva. Falhas (não instalado, activity renomeada) só
+     * passam pra próxima tentativa.
+     */
+    private fun tryGameNativeBoot(
+        context: Context,
+        target: EmulatorTarget,
+        appId: Int,
+        source: String?
+    ): Boolean {
+        val cleanSource = source?.uppercase()
+            ?.takeIf { it in EmulatorRegistry.gameNativeSources } ?: "STEAM"
+        for (intent in EmulatorRegistry.gameNativeBootIntents(target, appId, cleanSource)) {
+            try {
+                context.startActivity(intent)
+                return true
+            } catch (_: ActivityNotFoundException) {
+                // Tenta a próxima forma.
             } catch (_: SecurityException) {
                 // Activity existe mas não é exportada nesse build.
             }
@@ -249,7 +385,7 @@ object EmulatorLauncher {
             if (opened) {
                 Toast.makeText(
                     context,
-                    "Não consegui enviar o jogo direto; escolha ele dentro do emulador.",
+                    context.getString(R.string.boot_toast_home_fallback),
                     Toast.LENGTH_LONG
                 ).show()
                 return true
@@ -257,7 +393,7 @@ object EmulatorLauncher {
         }
         Toast.makeText(
             context,
-            "O emulador configurado não consegue abrir esta ROM.",
+            context.getString(R.string.boot_toast_no_rom),
             Toast.LENGTH_LONG
         ).show()
         return false

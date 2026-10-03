@@ -28,10 +28,12 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.btbugado.aerostation.ui.AppScreen
+import com.btbugado.aerostation.R
 import com.btbugado.aerostation.ui.theme.AeroGlassBorder
 import com.btbugado.aerostation.ui.theme.AeroGlassWhite
 import com.btbugado.aerostation.ui.theme.AeroGlassWhiteStrong
@@ -62,37 +64,37 @@ fun BottomNavBar(
     ) {
         NavBarItem(
             icon = NavIconType.HOME,
-            label = "Início",
+            label = stringResource(R.string.screens_nav_home),
             selected = current == AppScreen.HOME,
             onClick = { onSelect(AppScreen.HOME) }
         )
         NavBarItem(
             icon = NavIconType.CLOCK,
-            label = "Jogados",
+            label = stringResource(R.string.screens_nav_played),
             selected = current == AppScreen.PLAYED,
             onClick = { onSelect(AppScreen.PLAYED) }
         )
         NavBarItem(
             icon = NavIconType.APPS,
-            label = "Apps",
+            label = stringResource(R.string.screens_nav_apps),
             selected = current == AppScreen.APPS,
             onClick = { onSelect(AppScreen.APPS) }
         )
         NavBarItem(
             icon = NavIconType.PHOTO,
-            label = "Álbum",
+            label = stringResource(R.string.screens_nav_gallery),
             selected = current == AppScreen.GALLERY,
             onClick = { onSelect(AppScreen.GALLERY) }
         )
         NavBarItem(
             icon = NavIconType.TROPHY,
-            label = "Conquistas",
+            label = stringResource(R.string.screens_nav_achievements),
             selected = current == AppScreen.ACHIEVEMENTS,
             onClick = { onSelect(AppScreen.ACHIEVEMENTS) }
         )
         NavBarItem(
             icon = NavIconType.SETTINGS,
-            label = "Ajustes",
+            label = stringResource(R.string.screens_nav_settings),
             selected = current == AppScreen.SETTINGS,
             onClick = { onSelect(AppScreen.SETTINGS) }
         )

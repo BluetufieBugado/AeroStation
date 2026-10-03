@@ -176,7 +176,12 @@ fun Modifier.gamepadFocusable(
      * no cursor (ex: container fullscreen do viewer — o contorno do tamanho
      * da tela não faz sentido).
      */
-    announceCursor: Boolean = true
+    announceCursor: Boolean = true,
+    /**
+     * False = o A não toca o som de confirmar sozinho (o chamador toca o
+     * que fizer sentido no onConfirm — ex: Voltar do preview toca fechar).
+     */
+    playConfirmSound: Boolean = true
 ): Modifier {
     val gamepadEnabled = LocalGamepadEnabled.current
     val inDialog = LocalGamepadInDialog.current
@@ -212,6 +217,7 @@ fun Modifier.gamepadFocusable(
     // item focado observa o barramento e dispara seu próprio callback.
     val latestFocused by rememberUpdatedState(focused)
     val latestConfirm by rememberUpdatedState(onConfirm)
+    val latestPlayConfirm by rememberUpdatedState(playConfirmSound)
     val latestBack by rememberUpdatedState(onBack)
     val latestSecondary by rememberUpdatedState(onSecondary)
     val latestFocusGained by rememberUpdatedState(onFocusGained)
@@ -220,7 +226,7 @@ fun Modifier.gamepadFocusable(
     val secondaryTick = virtualEvents?.secondaryNonce ?: 0
     LaunchedEffect(confirmTick) {
         if (confirmTick != 0 && latestFocused) {
-            latestConfirm?.let { AppAudio.playConfirm(); it() }
+            latestConfirm?.let { if (latestPlayConfirm) AppAudio.playConfirm(); it() }
         }
     }
     LaunchedEffect(backTick) {
@@ -315,7 +321,7 @@ fun Modifier.gamepadFocusable(
                 KeyEvent.KEYCODE_DPAD_CENTER,
                 KeyEvent.KEYCODE_ENTER,
                 KeyEvent.KEYCODE_NUMPAD_ENTER -> {
-                    onConfirm?.let { AppAudio.playConfirm(); it() }
+                    onConfirm?.let { if (playConfirmSound) AppAudio.playConfirm(); it() }
                     onConfirm != null
                 }
                 KeyEvent.KEYCODE_BUTTON_X,

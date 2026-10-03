@@ -8,6 +8,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.animateScrollBy
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -32,6 +33,7 @@ import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -47,7 +49,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.compose.ui.res.stringResource
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -61,7 +67,9 @@ import com.btbugado.aerostation.data.DisplayGame
 import com.btbugado.aerostation.data.Game
 import com.btbugado.aerostation.data.GameLaunchSettingsStore
 import com.btbugado.aerostation.data.GameOverride
+import com.btbugado.aerostation.R
 import com.btbugado.aerostation.data.EmulatorLauncher
+import com.btbugado.aerostation.data.EmulatorRegistry
 import com.btbugado.aerostation.data.GameOverridesStore
 import com.btbugado.aerostation.data.LauncherContentCache
 import com.btbugado.aerostation.data.PlayTimeStore
@@ -69,6 +77,7 @@ import com.btbugado.aerostation.data.ScreenshotStore
 import com.btbugado.aerostation.data.RomExtensions
 import com.btbugado.aerostation.data.RomFolderStore
 import com.btbugado.aerostation.data.RomScanner
+import com.btbugado.aerostation.data.ScanCacheStore
 import com.btbugado.aerostation.data.SteamGridDbLauncher
 import com.btbugado.aerostation.data.withOverride
 import com.btbugado.aerostation.ui.components.CartridgeInsertOverlay
@@ -87,6 +96,7 @@ import com.btbugado.aerostation.ui.theme.AeroTextPrimary
 import com.btbugado.aerostation.ui.theme.AeroTextSecondary
 import androidx.lifecycle.LifecycleEventObserver
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import com.btbugado.aerostation.data.RaResult
@@ -180,11 +190,11 @@ fun HomeScreen(
             raRefreshTick++
             Toast.makeText(
                 context,
-                if (hadCustom) "Foto do RetroAchievements restaurada" else "Foto do RetroAchievements atualizada",
+                if (hadCustom) context.getString(R.string.home_ra_avatar_restored) else context.getString(R.string.home_ra_avatar_updated),
                 Toast.LENGTH_SHORT
             ).show()
         } else if (hadCustom) {
-            Toast.makeText(context, "Foto personalizada removida", Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, context.getString(R.string.home_custom_photo_removed), Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -194,6 +204,8 @@ fun HomeScreen(
     var pickImageForGame by remember { mutableStateOf<Game?>(null) }
     // Qual jogo está escolhendo a plataforma manual (override do .iso etc).
     var pickConsoleGame by remember { mutableStateOf<Game?>(null) }
+    // Qual jogo está definindo o ID da loja (boot do GameNative no PC).
+    var storeIdGame by remember { mutableStateOf<Game?>(null) }
     // Preview 3D (toque/A no card) e inserção (após Jogar, antes do boot).
     var previewGame by remember { mutableStateOf<DisplayGame?>(null) }
     var insertingGame by remember { mutableStateOf<DisplayGame?>(null) }
@@ -253,7 +265,7 @@ fun HomeScreen(
             } else {
                 Toast.makeText(
                     context,
-                    "Não consegui usar essa imagem",
+                    context.getString(R.string.common_image_failed),
                     Toast.LENGTH_SHORT
                 ).show()
             }
@@ -271,7 +283,7 @@ fun HomeScreen(
                 if (localPath != null) {
                     updateOverride(target) { it.copy(artUri = localPath, artSource = ArtSource.CUSTOM) }
                 } else {
-                    Toast.makeText(context, "Não consegui usar essa imagem", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(context, context.getString(R.string.common_image_failed), Toast.LENGTH_SHORT).show()
                 }
             }
         }
@@ -299,13 +311,13 @@ fun HomeScreen(
                     }
                     Toast.makeText(
                         context,
-                        "Capa do SteamGridDB aplicada!",
+                        context.getString(R.string.home_steamgriddb_cover_applied),
                         Toast.LENGTH_SHORT
                     ).show()
                 } else {
                     Toast.makeText(
                         context,
-                        "Não consegui usar essa imagem",
+                        context.getString(R.string.common_image_failed),
                         Toast.LENGTH_SHORT
                     ).show()
                 }
@@ -370,9 +382,27 @@ fun HomeScreen(
             return@LaunchedEffect
         }
 
+        // Abertura a frio (sem cache em memória): mostra o último scan do
+        // disco na hora e reescaneia em silêncio — pasta de PC com milhares
+        // de arquivos de apoio não prende mais a lista no "carregando".
+        if (refreshTick == 0) {
+            ScanCacheStore.loadDisk(context, uri)?.let { disk ->
+                LauncherContentCache.putGames(uri, disk)
+                games = disk
+                isScanning = false
+            } ?: run { isScanning = true }
+            val scanned = RomScanner.scan(context, uri)
+            LauncherContentCache.putGames(uri, scanned)
+            ScanCacheStore.saveDisk(context, uri, scanned)
+            games = scanned
+            isScanning = false
+            return@LaunchedEffect
+        }
+
         isScanning = true
         val scanned = RomScanner.scan(context, uri)
         LauncherContentCache.putGames(uri, scanned)
+        ScanCacheStore.saveDisk(context, uri, scanned)
         games = scanned
         isScanning = false
     }
@@ -434,6 +464,10 @@ fun HomeScreen(
     // fila reassumir o recuo inicial (76dp). Sem isso o bringIntoView parava
     // no mínimo visível e o card colava na borda esquerda.
     val rowState = rememberLazyListState()
+    // Qual card está focado agora (pra blindar o empurrão do último item).
+    var focusedCardIndex by remember { mutableStateOf<Int?>(null) }
+    // Respiro do fim da fila em px (espelha o end = 96.dp do padding).
+    val trailingPadPx = with(LocalDensity.current) { 96.dp.toPx() }
 
     Box(modifier = Modifier.fillMaxSize()) {
         // Cabeçalho inspirado no Nintendo Switch:
@@ -524,16 +558,16 @@ fun HomeScreen(
 
             folderUri == null -> {
                 EmptyState(
-                    message = "Nenhuma pasta de ROMs selecionada ainda.\nToque no \"+\" no canto superior pra começar."
+                    message = stringResource(R.string.home_empty_no_folder)
                 )
             }
 
             displayGames.isEmpty() -> {
                 EmptyState(
                     message = if (folderUri == null) {
-                        "Nenhum jogo ou aplicativo adicionado à tela inicial ainda."
+                        stringResource(R.string.home_empty_no_games_no_folder)
                     } else {
-                        "Nenhuma ROM encontrada nessa pasta.\nConfira se os arquivos têm uma extensão reconhecida."
+                        stringResource(R.string.home_empty_no_roms_found)
                     }
                 )
             }
@@ -544,8 +578,10 @@ fun HomeScreen(
                     contentPadding = PaddingValues(
                         // A fila começa no eixo X do botão de refresh (76dp),
                         // como no Switch — sem isso os cards colavam na borda.
+                        // No FIM o respiro é generoso (96dp): o último card
+                        // descansa longe da borda direita em vez de enterrar.
                         start = 76.dp,
-                        end = 32.dp,
+                        end = 96.dp,
                         top = contentPadding.calculateTopPadding(),
                         bottom = contentPadding.calculateBottomPadding()
                     ),
@@ -560,15 +596,33 @@ fun HomeScreen(
                             artUrl = displayGame.artUrl,
                             modifier = Modifier.width(GameCardWidth),
                             gamepadAutoFocus = gamepadActive && index == 0,
-                            // O primeiro card é o alvo do Baixo vindo do topo.
+                            // Alvo do Baixo vindo do topo: o primeiro VISÍVEL,
+                            // não o item 0. Mirar o 0 com a fila rolada era
+                            // pedir foco num nó fora da tela (ou descartado):
+                            // o cursor sumia no caminho topo -> fileira.
                             // Todos os cards voltam pro topo com Cima, pra nunca
                             // ficar preso na fileira sem rota de volta.
                             // Focar o primeiro recentraliza a fila no recuo inicial.
-                            focusRequester = if (index == 0) firstGameRequester else null,
+                            focusRequester = if (index == rowState.firstVisibleItemIndex) firstGameRequester else null,
                             nextUp = refreshRequester,
-                            onFocusGained = if (index == 0) {
-                                { scope.launch { rowState.animateScrollToItem(0) } }
-                            } else null,
+                            onFocusGained = {
+                                focusedCardIndex = index
+                                if (index == 0) {
+                                    scope.launch { rowState.animateScrollToItem(0) }
+                                } else if (index == displayGames.lastIndex) {
+                                    // Espelho do primeiro: o bringIntoView revela
+                                    // o mínimo e o último colava na borda direita.
+                                    // Espera ele assentar e empurra o respiro do
+                                    // fim pra vista. O gate cancela se o cursor
+                                    // já foi pra outro card nesse meio-tempo.
+                                    scope.launch {
+                                        delay(150)
+                                        if (focusedCardIndex == displayGames.lastIndex) {
+                                            rowState.animateScrollBy(trailingPadPx)
+                                        }
+                                    }
+                                }
+                            },
                             onClick = { openDisplayGame(displayGame) },
                             onLongClick = { menuGame = displayGame.game },
                             // Verso estilo live tile: console + tempo total.
@@ -589,6 +643,7 @@ fun HomeScreen(
 
         menuGame?.let { game ->
             val currentName = overrides[game.uri.toString()]?.customName ?: game.name
+            val effectiveConsole = overrides[game.uri.toString()]?.console ?: game.console
             GameActionMenu(
                 gameName = currentName,
                 onDismiss = { menuGame = null },
@@ -616,7 +671,7 @@ fun HomeScreen(
                         steamGridGame = null
                         Toast.makeText(
                             context,
-                            "Não consegui abrir o navegador",
+                            context.getString(R.string.common_browser_failed),
                             Toast.LENGTH_SHORT
                         ).show()
                     }
@@ -633,7 +688,7 @@ fun HomeScreen(
                         } else {
                             Toast.makeText(
                                 context,
-                                "Não encontrei capa automática pra esse jogo",
+                                context.getString(R.string.home_auto_cover_not_found),
                                 Toast.LENGTH_SHORT
                             ).show()
                         }
@@ -643,6 +698,12 @@ fun HomeScreen(
                     pickConsoleGame = game
                     menuGame = null
                 },
+                onPickStoreId = if (effectiveConsole == "PC") {
+                    {
+                        storeIdGame = game
+                        menuGame = null
+                    }
+                } else null,
                 onResetToDefault = {
                     menuGame = null
                     clearOverride(game)
@@ -682,12 +743,36 @@ fun HomeScreen(
                     Toast.makeText(
                         context,
                         if (selected == null) {
-                            "Plataforma automática restaurada"
+                            context.getString(R.string.home_platform_auto_restored)
                         } else {
-                            "Plataforma definida: $selected"
+                            context.getString(R.string.home_platform_set, selected)
                         },
                         Toast.LENGTH_SHORT
                     ).show()
+                }
+            )
+        }
+
+        storeIdGame?.let { game ->
+            val key = game.uri.toString()
+            val current = overrides[key]
+            StoreIdDialog(
+                currentAppId = current?.storeAppId,
+                currentSource = current?.storeSource,
+                onDismiss = { storeIdGame = null },
+                onConfirm = { appId, source ->
+                    updateOverride(game) { it.copy(storeAppId = appId, storeSource = source) }
+                    storeIdGame = null
+                    Toast.makeText(
+                        context,
+                        context.getString(R.string.home_store_id_set, source, appId),
+                        Toast.LENGTH_SHORT
+                    ).show()
+                },
+                onClear = {
+                    updateOverride(game) { it.copy(storeAppId = null, storeSource = null) }
+                    storeIdGame = null
+                    Toast.makeText(context, context.getString(R.string.home_store_id_removed), Toast.LENGTH_SHORT).show()
                 }
             )
         }
@@ -741,13 +826,14 @@ private fun ConsolePickerDialog(
     GamepadDialogScope {
         AlertDialog(
             onDismissRequest = onDismiss,
-            title = { Text("Plataforma do jogo") },
+            title = { Text(stringResource(R.string.home_console_picker_title)) },
             text = {
                 Column {
                     LazyColumn(modifier = Modifier.height(320.dp)) {
                         itemsIndexed(options, key = { index, it -> it ?: "auto-$index" }) { index, console ->
                             val label = console
-                                ?: "Automática${if (autoConsole != null) " ($autoConsole)" else ""}"
+                                ?: autoConsole?.let { stringResource(R.string.home_console_picker_auto, it) }
+                                ?: stringResource(R.string.home_console_picker_auto_plain)
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
@@ -783,7 +869,106 @@ private fun ConsolePickerDialog(
                 TextButton(
                     onClick = onDismiss,
                     modifier = Modifier.gamepadFocusable(onConfirm = onDismiss, onBack = onDismiss)
-                ) { Text("Cancelar") }
+                ) { Text(stringResource(R.string.common_cancel)) }
+            },
+            shape = RoundedCornerShape(20.dp)
+        )
+    }
+}
+
+/**
+ * Diálogo pra mapear um jogo de PC no ID da loja (boot do GameNative).
+ *
+ * O GameNative não abre arquivo (.exe) por intent: o boot é pelo jogo já
+ * INSTALADO nele, via AppID da loja (Steam etc). O usuário digita o ID uma
+ * vez (ex: 1145360) e escolhe a loja; fica salvo no override do jogo.
+ */
+@Composable
+private fun StoreIdDialog(
+    currentAppId: Int?,
+    currentSource: String?,
+    onDismiss: () -> Unit,
+    onConfirm: (Int, String) -> Unit,
+    onClear: () -> Unit
+) {
+    val context = LocalContext.current
+    var text by remember { mutableStateOf(currentAppId?.toString().orEmpty()) }
+    var source by remember { mutableStateOf(currentSource ?: "STEAM") }
+
+    fun confirm() {
+        val id = text.trim().toIntOrNull()?.takeIf { it > 0 }
+        if (id == null) {
+            Toast.makeText(context, context.getString(R.string.home_store_id_invalid), Toast.LENGTH_SHORT).show()
+            return
+        }
+        onConfirm(id, source)
+    }
+
+    GamepadDialogScope {
+        AlertDialog(
+            onDismissRequest = onDismiss,
+            title = { Text(stringResource(R.string.home_store_id_title)) },
+            text = {
+                Column {
+                    Text(
+                        stringResource(R.string.home_store_id_description),
+                        color = AeroTextSecondary,
+                        fontSize = 13.sp
+                    )
+                    OutlinedTextField(
+                        value = text,
+                        onValueChange = { text = it.filter { c -> c.isDigit() } },
+                        singleLine = true,
+                        placeholder = { Text(stringResource(R.string.home_store_id_placeholder)) },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 8.dp)
+                    )
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        modifier = Modifier.padding(bottom = 4.dp)
+                    ) {
+                        for (option in EmulatorRegistry.gameNativeSources) {
+                            val selected = option == source
+                            TextButton(
+                                onClick = { source = option },
+                                modifier = Modifier.gamepadFocusable(
+                                    onConfirm = { source = option },
+                                    onBack = onDismiss
+                                )
+                            ) {
+                                Text(
+                                    text = if (selected) "● $option" else option,
+                                    color = if (selected) AeroTextPrimary else AeroTextSecondary
+                                )
+                            }
+                        }
+                    }
+                    DialogGamepadBar()
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = { confirm() },
+                    modifier = Modifier.gamepadFocusable(
+                        autoFocus = true,
+                        onConfirm = { confirm() },
+                        onBack = onDismiss
+                    )
+                ) { Text(stringResource(R.string.common_save)) }
+            },
+            dismissButton = {
+                Row {
+                    TextButton(
+                        onClick = onClear,
+                        modifier = Modifier.gamepadFocusable(onConfirm = onClear, onBack = onDismiss)
+                    ) { Text(stringResource(R.string.home_store_id_clear)) }
+                    TextButton(
+                        onClick = onDismiss,
+                        modifier = Modifier.gamepadFocusable(onConfirm = onDismiss, onBack = onDismiss)
+                    ) { Text(stringResource(R.string.common_cancel)) }
+                }
             },
             shape = RoundedCornerShape(20.dp)
         )

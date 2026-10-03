@@ -3,6 +3,8 @@ plugins {
     id("org.jetbrains.kotlin.android")
 }
 
+import java.util.Properties
+
 android {
     namespace = "com.btbugado.aerostation"
     compileSdk = 34
@@ -11,8 +13,32 @@ android {
         applicationId = "com.btbugado.aerostation"
         minSdk = 26
         targetSdk = 34
-        versionCode = 1
-        versionName = "0.1"
+        versionCode = 2
+        versionName = "1.0"
+    }
+
+    // Assinatura release com a keystore local (keystore.properties, fora do
+    // git). Sem o arquivo, a release cai pra chave de debug pra não quebrar
+    // o build em máquina nova — mas o APK distribuído TEM que sair assinado.
+    signingConfigs {
+        create("release") {
+            val propsFile = rootProject.file("keystore.properties")
+            if (propsFile.isFile) {
+                val props = Properties().apply { load(propsFile.inputStream()) }
+                storeFile = rootProject.file(props.getProperty("storeFile"))
+                storePassword = props.getProperty("storePassword")
+                keyAlias = props.getProperty("keyAlias")
+                keyPassword = props.getProperty("keyPassword")
+            }
+        }
+    }
+
+    buildTypes {
+        release {
+            signingConfig = signingConfigs.getByName(
+                if (rootProject.file("keystore.properties").isFile) "release" else "debug"
+            )
+        }
     }
 
     buildFeatures {

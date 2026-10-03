@@ -40,10 +40,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
+import com.btbugado.aerostation.R
 import com.btbugado.aerostation.data.AndroidGameStore
 import com.btbugado.aerostation.data.AppAudio
 import com.btbugado.aerostation.data.AudioSettingsStore
@@ -52,6 +54,8 @@ import com.btbugado.aerostation.data.Credits
 import com.btbugado.aerostation.data.EmulatorConfigStore
 import com.btbugado.aerostation.data.EmulatorRegistry
 import com.btbugado.aerostation.data.GameLaunchSettingsStore
+import com.btbugado.aerostation.data.LanguageStore
+import com.btbugado.aerostation.data.PlayTimeStore
 import com.btbugado.aerostation.data.RetroAchievementsStore
 import com.btbugado.aerostation.data.RomExtensions
 import com.btbugado.aerostation.ui.theme.AeroTextPrimary
@@ -78,7 +82,9 @@ fun SettingsScreen(
     gamepadActive: Boolean = false,
     controlMode: ControlMode = ControlMode.TOUCH,
     onControlModeChange: (ControlMode) -> Unit = {},
-    onEditPadLayout: () -> Unit = {}
+    onEditPadLayout: () -> Unit = {},
+    navAutoHide: Boolean = true,
+    onNavAutoHideChange: (Boolean) -> Unit = {}
 ) {
     val context = androidx.compose.ui.platform.LocalContext.current
     var selectedConsole by remember { mutableStateOf<String?>(null) }
@@ -124,35 +130,40 @@ fun SettingsScreen(
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 Text(
-                    text = "Configurações",
+                    text = stringResource(R.string.settings_title_config),
                     color = AeroTextPrimary,
                     fontSize = 26.sp,
                     modifier = Modifier.padding(start = 8.dp, bottom = 12.dp)
                 )
 
                 SettingsCategoryItem(
-                    title = "Geral",
+                    title = stringResource(R.string.settings_category_general),
                     selected = selectedCategory == "Geral",
                     gamepadAutoFocus = gamepadActive,
                     onClick = { selectedCategory = "Geral" }
                 )
                 SettingsCategoryItem(
-                    title = "Emuladores",
+                    title = stringResource(R.string.settings_category_emulators),
                     selected = selectedCategory == "Emuladores",
                     onClick = { selectedCategory = "Emuladores" }
                 )
                 SettingsCategoryItem(
-                    title = "Conquistas",
+                    title = stringResource(R.string.settings_category_achievements),
                     selected = selectedCategory == "Conquistas",
                     onClick = { selectedCategory = "Conquistas" }
                 )
                 SettingsCategoryItem(
-                    title = "Áudio",
+                    title = stringResource(R.string.settings_category_audio),
                     selected = selectedCategory == "Áudio",
                     onClick = { selectedCategory = "Áudio" }
                 )
                 SettingsCategoryItem(
-                    title = "Créditos",
+                    title = stringResource(R.string.settings_category_themes),
+                    selected = selectedCategory == "Temas",
+                    onClick = { selectedCategory = "Temas" }
+                )
+                SettingsCategoryItem(
+                    title = stringResource(R.string.settings_category_credits),
                     selected = selectedCategory == "Créditos",
                     onClick = { selectedCategory = "Créditos" }
                 )
@@ -176,51 +187,51 @@ fun SettingsScreen(
                                 .verticalScroll(rememberScrollState())
                         ) {
                             Text(
-                                text = "Geral",
+                                text = stringResource(R.string.settings_category_general),
                                 color = AeroTextPrimary,
                                 fontSize = 26.sp,
                                 modifier = Modifier.padding(bottom = 6.dp)
                             )
                             Text(
-                                text = "Configurações gerais do RetroAero.",
+                                text = stringResource(R.string.settings_desc_general),
                                 color = AeroTextSecondary,
                                 fontSize = 14.sp,
                                 modifier = Modifier.padding(bottom = 18.dp)
                             )
 
                             SettingsItem(
-                                title = "Adicionar aplicativo como jogo",
+                                title = stringResource(R.string.settings_item_add_app_title),
                                 // A categoria "Geral" já é o ponto de entrada
                                 // desta tela. Ter dois auto-focos concorrentes
                                 // deixava o cursor escolher um alvo ao acaso ao
                                 // chegar aqui via L1/R1.
                                 gamepadAutoFocus = false,
-                                subtitle = "Coloca um app Android na sua biblioteca da tela inicial.",
+                                subtitle = stringResource(R.string.settings_desc_add_app),
                                 onClick = { showAndroidAppPicker = true }
                             )
 
                             Spacer(modifier = Modifier.height(12.dp))
 
                             Text(
-                                text = "Modo de entrada",
+                                text = stringResource(R.string.settings_title_input_mode),
                                 color = AeroTextPrimary,
                                 fontSize = 16.sp,
                                 modifier = Modifier.padding(start = 6.dp, bottom = 2.dp)
                             )
                         Text(
-                            text = "No modo controle aparece um gamepad de vidro na tela e o cursor fica visível. Nesse modo os toques nos botões e cartuchos são ignorados (só o gamepad ativa) para não abrir nada sem querer. O controle físico também funciona nesse modo. No modo toque o cursor nunca aparece.",
+                            text = stringResource(R.string.settings_desc_input_mode),
                             color = AeroTextSecondary,
                             fontSize = 13.sp,
                             modifier = Modifier.padding(start = 6.dp, bottom = 10.dp)
                         )
 
                             SettingsItem(
-                                title = "Toque",
+                                title = stringResource(R.string.settings_option_touch),
                                 gamepadAutoFocus = false,
                                 subtitle = if (controlMode == ControlMode.TOUCH) {
-                                    "Ativo — navegar com o dedo, sem cursor."
+                                    stringResource(R.string.settings_desc_touch_active)
                                 } else {
-                                    "Navegar com o dedo, sem cursor."
+                                    stringResource(R.string.settings_desc_touch_inactive)
                                 },
                                 onClick = { onControlModeChange(ControlMode.TOUCH) },
                                 trailing = {
@@ -238,12 +249,12 @@ fun SettingsScreen(
                             Spacer(modifier = Modifier.height(10.dp))
 
                             SettingsItem(
-                                title = "Controle",
+                                title = stringResource(R.string.settings_option_gamepad),
                                 gamepadAutoFocus = false,
                                 subtitle = if (controlMode == ControlMode.GAMEPAD) {
-                                    "Ativo — gamepad na tela + cursor visível."
+                                    stringResource(R.string.settings_desc_gamepad_active)
                                 } else {
-                                    "Gamepad na tela + cursor visível."
+                                    stringResource(R.string.settings_desc_gamepad_inactive)
                                 },
                                 onClick = { onControlModeChange(ControlMode.GAMEPAD) },
                                 trailing = {
@@ -261,34 +272,45 @@ fun SettingsScreen(
                             Spacer(modifier = Modifier.height(10.dp))
 
                             SettingsItem(
-                                title = "Editar controles na tela",
+                                title = stringResource(R.string.settings_item_edit_pad),
                                 gamepadAutoFocus = false,
-                                subtitle = "Muda a posição e o tamanho do gamepad virtual.",
+                                subtitle = stringResource(R.string.settings_desc_edit_pad),
                                 onClick = onEditPadLayout
                             )
 
                             Spacer(modifier = Modifier.height(12.dp))
 
+                            // Seletor de idioma do app (vale após recreate).
+                            LanguageRow()
+
+                            Spacer(modifier = Modifier.height(12.dp))
+
+                            // Tempo de jogo preciso (foreground real via
+                            // UsageStats; sem a permissão, vale o relógio).
+                            PlaytimeRow()
+
+                            Spacer(modifier = Modifier.height(12.dp))
+
                             Text(
-                                text = "Ao abrir um jogo",
+                                text = stringResource(R.string.settings_title_on_launch),
                                 color = AeroTextPrimary,
                                 fontSize = 16.sp,
                                 modifier = Modifier.padding(start = 6.dp, bottom = 2.dp)
                             )
                             Text(
-                                text = "Com animação mostra o preview 3D e a inserção antes de abrir. Direto pula tudo e inicia na hora.",
+                                text = stringResource(R.string.settings_desc_on_launch),
                                 color = AeroTextSecondary,
                                 fontSize = 13.sp,
                                 modifier = Modifier.padding(start = 6.dp, bottom = 10.dp)
                             )
 
                             SettingsItem(
-                                title = "Com animação",
+                                title = stringResource(R.string.settings_option_with_animation),
                                 gamepadAutoFocus = false,
                                 subtitle = if (previewEnabled) {
-                                    "Ativo — preview 3D + inserção."
+                                    stringResource(R.string.settings_desc_with_animation_active)
                                 } else {
-                                    "Preview 3D + inserção."
+                                    stringResource(R.string.settings_desc_with_animation_inactive)
                                 },
                                 onClick = {
                                     previewEnabled = true
@@ -309,12 +331,12 @@ fun SettingsScreen(
                             Spacer(modifier = Modifier.height(10.dp))
 
                             SettingsItem(
-                                title = "Direto",
+                                title = stringResource(R.string.settings_option_direct),
                                 gamepadAutoFocus = false,
                                 subtitle = if (!previewEnabled) {
-                                    "Ativo — inicia na hora, sem preview."
+                                    stringResource(R.string.settings_desc_direct_active)
                                 } else {
-                                    "Inicia na hora, sem preview."
+                                    stringResource(R.string.settings_desc_direct_inactive)
                                 },
                                 onClick = {
                                     previewEnabled = false
@@ -335,25 +357,25 @@ fun SettingsScreen(
                             Spacer(modifier = Modifier.height(12.dp))
 
                             Text(
-                                text = "Na tela inicial",
+                                text = stringResource(R.string.settings_title_home_screen),
                                 color = AeroTextPrimary,
                                 fontSize = 16.sp,
                                 modifier = Modifier.padding(start = 6.dp, bottom = 2.dp)
                             )
                             Text(
-                                text = "Com flip os cartões viram sozinhos mostrando o tempo de jogo no verso. Parados economiza bateria.",
+                                text = stringResource(R.string.settings_desc_home_screen),
                                 color = AeroTextSecondary,
                                 fontSize = 13.sp,
                                 modifier = Modifier.padding(start = 6.dp, bottom = 10.dp)
                             )
 
                             SettingsItem(
-                                title = "Com flip",
+                                title = stringResource(R.string.settings_option_with_flip),
                                 gamepadAutoFocus = false,
                                 subtitle = if (flipEnabled) {
-                                    "Ativo — vira a cada alguns segundos."
+                                    stringResource(R.string.settings_desc_with_flip_active)
                                 } else {
-                                    "Vira a cada alguns segundos."
+                                    stringResource(R.string.settings_desc_with_flip_inactive)
                                 },
                                 onClick = {
                                     flipEnabled = true
@@ -374,12 +396,12 @@ fun SettingsScreen(
                             Spacer(modifier = Modifier.height(10.dp))
 
                             SettingsItem(
-                                title = "Parados",
+                                title = stringResource(R.string.settings_option_still),
                                 gamepadAutoFocus = false,
                                 subtitle = if (!flipEnabled) {
-                                    "Ativo — capa sempre à mostra."
+                                    stringResource(R.string.settings_desc_still_active)
                                 } else {
-                                    "Capa sempre à mostra."
+                                    stringResource(R.string.settings_desc_still_inactive)
                                 },
                                 onClick = {
                                     flipEnabled = false
@@ -415,9 +437,44 @@ fun SettingsScreen(
 
                             Spacer(modifier = Modifier.height(12.dp))
 
+                            // Barra inferior: auto-hide no scroll + gesto manual
+                            // (segurar o fundo). A chave só afeta o scroll; o
+                            // gesto vale sempre no modo touch.
+                            SettingsItem(
+                                title = stringResource(R.string.settings_title_nav_autohide),
+                                gamepadAutoFocus = false,
+                                subtitle = if (navAutoHide) {
+                                    stringResource(R.string.settings_desc_nav_autohide_on)
+                                } else {
+                                    stringResource(R.string.settings_desc_nav_autohide_off)
+                                },
+                                onClick = { onNavAutoHideChange(!navAutoHide) },
+                                trailing = {
+                                    if (navAutoHide) {
+                                        Text(
+                                            text = "✓",
+                                            color = AeroTextPrimary,
+                                            fontSize = 18.sp,
+                                            modifier = Modifier.padding(start = 8.dp)
+                                        )
+                                    }
+                                }
+                            )
+
+                            Spacer(modifier = Modifier.height(4.dp))
+
+                            Text(
+                                text = stringResource(R.string.settings_desc_nav_gesture),
+                                color = AeroTextSecondary,
+                                fontSize = 13.sp,
+                                modifier = Modifier.padding(start = 6.dp, bottom = 10.dp)
+                            )
+
+                            Spacer(modifier = Modifier.height(12.dp))
+
                             // Espaço reservado para futuras configurações gerais.
                             Text(
-                                text = "Mais opções poderão aparecer aqui no futuro.",
+                                text = stringResource(R.string.settings_desc_more_options_future),
                                 color = AeroTextSecondary,
                                 fontSize = 13.sp,
                                 modifier = Modifier.padding(start = 6.dp, top = 6.dp, bottom = 12.dp)
@@ -437,6 +494,13 @@ fun SettingsScreen(
                         )
                     }
 
+                    "Temas" -> {
+                        ThemesSettings(
+                            gamepadActive = gamepadActive,
+                            selectedCategory = selectedCategory
+                        )
+                    }
+
                     "Créditos" -> {
                         CreditsSettings(
                             gamepadActive = gamepadActive,
@@ -448,13 +512,13 @@ fun SettingsScreen(
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Column(modifier = Modifier.weight(1f)) {
                                 Text(
-                                    text = "Emuladores",
+                                    text = stringResource(R.string.settings_category_emulators),
                                     color = AeroTextPrimary,
                                     fontSize = 26.sp,
                                     modifier = Modifier.padding(bottom = 6.dp)
                                 )
                                 Text(
-                                    text = "Escolha qual aplicativo abre cada console.",
+                                    text = stringResource(R.string.settings_desc_emulators),
                                     color = AeroTextSecondary,
                                     fontSize = 14.sp,
                                     modifier = Modifier.padding(bottom = 14.dp)
@@ -492,7 +556,7 @@ fun SettingsScreen(
                                 value = emulatorSearch,
                                 onValueChange = { emulatorSearch = it },
                                 singleLine = true,
-                                placeholder = { Text("Pesquisar plataforma...") },
+                                placeholder = { Text(stringResource(R.string.settings_placeholder_search_platform)) },
                                 leadingIcon = { Text(text = "🔍") },
                                 modifier = Modifier
                                     .fillMaxWidth()
@@ -502,7 +566,7 @@ fun SettingsScreen(
 
                         if (filteredConsoles.isEmpty()) {
                             Text(
-                                text = "Nenhuma plataforma encontrada para \"${emulatorSearch.trim()}\".",
+                                text = stringResource(R.string.settings_empty_no_platform_for_query, emulatorSearch.trim()),
                                 color = AeroTextSecondary,
                                 fontSize = 14.sp,
                                 modifier = Modifier.padding(start = 6.dp, top = 8.dp)
@@ -517,7 +581,7 @@ fun SettingsScreen(
                                     val configuredPackage = EmulatorConfigStore.getPackageCompat(context, console)
                                     val configuredLabel = configuredPackage?.let { packageLabel(context, it) }
                                     val defaultTarget = EmulatorRegistry.defaultTarget(context, console)
-                                    val label = configuredLabel ?: defaultTarget?.displayName ?: "Nenhum configurado"
+                                    val label = configuredLabel ?: defaultTarget?.displayName ?: stringResource(R.string.settings_label_none_configured)
 
                                     SettingsItem(
                                         title = console,
@@ -542,7 +606,7 @@ fun SettingsScreen(
                 val added = AndroidGameStore.add(context, packageName, activityName, label)
                 Toast.makeText(
                     context,
-                    if (added) "${label} adicionado à tela inicial!" else "Esse aplicativo já está na tela inicial.",
+                    if (added) context.getString(R.string.settings_toast_app_added, label) else context.getString(R.string.settings_toast_app_already_exists),
                     Toast.LENGTH_SHORT
                 ).show()
                 showAndroidAppPicker = false
@@ -588,19 +652,19 @@ private fun AchievementsSettings(gamepadActive: Boolean) {
             .verticalScroll(rememberScrollState())
     ) {
         Text(
-            text = "Conquistas",
+            text = stringResource(R.string.settings_category_achievements),
             color = AeroTextPrimary,
             fontSize = 26.sp,
             modifier = Modifier.padding(bottom = 6.dp)
         )
         Text(
-            text = "Mostra perfil e progresso na aba Conquistas.",
+            text = stringResource(R.string.settings_desc_achievements),
             color = AeroTextSecondary,
             fontSize = 14.sp,
             modifier = Modifier.padding(bottom = 4.dp)
         )
         Text(
-            text = "A chave fica só no aparelho. Gere em retroachievements.org > Settings.",
+            text = stringResource(R.string.settings_desc_achievements_key_privacy),
             color = AeroTextSecondary,
             fontSize = 13.sp,
             modifier = Modifier.padding(start = 6.dp, bottom = 14.dp)
@@ -610,7 +674,7 @@ private fun AchievementsSettings(gamepadActive: Boolean) {
             value = username,
             onValueChange = { username = it; savedTick = 0 },
             singleLine = true,
-            label = { Text("Usuário") },
+            label = { Text(stringResource(R.string.settings_label_username)) },
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(bottom = 10.dp)
@@ -619,11 +683,11 @@ private fun AchievementsSettings(gamepadActive: Boolean) {
             value = apiKey,
             onValueChange = { apiKey = it; savedTick = 0 },
             singleLine = true,
-            label = { Text("Chave de API") },
+            label = { Text(stringResource(R.string.settings_label_api_key)) },
             visualTransformation = if (showKey) VisualTransformation.None else PasswordVisualTransformation(),
             trailingIcon = {
                 TextButton(onClick = { showKey = !showKey }) {
-                    Text(if (showKey) "Ocultar" else "Ver", fontSize = 12.sp)
+                    Text(if (showKey) stringResource(R.string.settings_action_hide) else stringResource(R.string.settings_action_show), fontSize = 12.sp)
                 }
             },
             modifier = Modifier
@@ -632,9 +696,9 @@ private fun AchievementsSettings(gamepadActive: Boolean) {
         )
 
         SettingsItem(
-            title = "Salvar",
+            title = stringResource(R.string.common_save),
             gamepadAutoFocus = gamepadActive,
-            subtitle = "Conecta a conta e libera a aba Conquistas.",
+            subtitle = stringResource(R.string.settings_desc_save_achievements),
             onClick = {
                 RetroAchievementsStore.save(context, username, apiKey)
                 savedTick++
@@ -643,7 +707,7 @@ private fun AchievementsSettings(gamepadActive: Boolean) {
 
         if (savedTick > 0) {
             Text(
-                text = "✓ Salvo! Abra a aba Conquistas.",
+                text = stringResource(R.string.settings_msg_saved_open_achievements),
                 color = AeroTextPrimary,
                 fontSize = 13.sp,
                 modifier = Modifier.padding(start = 6.dp, top = 10.dp)
@@ -669,20 +733,20 @@ private fun AudioSettings(gamepadActive: Boolean) {
             .verticalScroll(rememberScrollState())
     ) {
         Text(
-            text = "Áudio",
+            text = stringResource(R.string.settings_category_audio),
             color = AeroTextPrimary,
             fontSize = 26.sp,
             modifier = Modifier.padding(bottom = 6.dp)
         )
         Text(
-            text = "Música ambiente em looping e sons de navegação.",
+            text = stringResource(R.string.settings_desc_audio),
             color = AeroTextSecondary,
             fontSize = 14.sp,
             modifier = Modifier.padding(bottom = 18.dp)
         )
 
         VolumeRow(
-            title = "Música",
+            title = stringResource(R.string.settings_label_music),
             value = music,
             onChange = {
                 music = it
@@ -694,9 +758,9 @@ private fun AudioSettings(gamepadActive: Boolean) {
         Spacer(modifier = Modifier.height(12.dp))
 
         VolumeRow(
-            title = "Efeitos",
+            title = stringResource(R.string.settings_label_effects),
             value = sfx,
-            subtitle = "Cursor, confirmar, janelas e início de jogo.",
+            subtitle = stringResource(R.string.settings_desc_effects),
             onChange = {
                 sfx = it
                 AudioSettingsStore.setSfxVolume(context, it)
@@ -706,11 +770,125 @@ private fun AudioSettings(gamepadActive: Boolean) {
         Spacer(modifier = Modifier.height(12.dp))
 
         SettingsItem(
-            title = "Testar efeitos",
+            title = stringResource(R.string.settings_item_test_effects),
             gamepadAutoFocus = gamepadActive,
-            subtitle = "Toca o som de início de jogo.",
+            subtitle = stringResource(R.string.settings_desc_test_effects),
             onClick = { AppAudio.playLaunch() }
         )
+    }
+}
+
+/**
+ * Tempo de jogo preciso: com a permissão de acesso a dados de uso, a
+ * contagem usa o tempo REAL do jogo/emulador em primeiro plano (não conta
+ * horas com tudo fechado). Sem ela, vale o relógio de parede com teto.
+ * O toque abre a tela do Android pra liberar.
+ */
+@Composable
+private fun PlaytimeRow() {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    var granted by remember { mutableStateOf(PlayTimeStore.hasUsagePermission(context)) }
+    val lifecycleOwner = androidx.compose.ui.platform.LocalLifecycleOwner.current
+    androidx.compose.runtime.DisposableEffect(lifecycleOwner) {
+        val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
+            if (event == androidx.lifecycle.Lifecycle.Event.ON_RESUME) {
+                granted = PlayTimeStore.hasUsagePermission(context)
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
+
+    SettingsItem(
+        title = stringResource(R.string.settings_title_playtime),
+        gamepadAutoFocus = false,
+        subtitle = if (granted) {
+            stringResource(R.string.settings_desc_playtime_on)
+        } else {
+            stringResource(R.string.settings_desc_playtime_off)
+        },
+        onClick = {
+            runCatching {
+                context.startActivity(
+                    android.content.Intent(android.provider.Settings.ACTION_USAGE_ACCESS_SETTINGS)
+                )
+            }
+        }
+    )
+}
+
+/**
+ * Seletor de idioma do app (Configurações > Geral > Idioma). Trocar salva
+ * e recria a Activity pra aplicar na hora.
+ */
+@Composable
+private fun LanguageRow() {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val activity = context as? android.app.Activity
+    var showDialog by remember { mutableStateOf(false) }
+    var current by remember { mutableStateOf(LanguageStore.get(context)) }
+
+    SettingsItem(
+        title = stringResource(R.string.settings_title_language),
+        gamepadAutoFocus = false,
+        subtitle = stringResource(LanguageStore.labelRes(current)),
+        onClick = { showDialog = true }
+    )
+
+    if (showDialog) {
+        GamepadDialogScope {
+            AlertDialog(
+                onDismissRequest = { showDialog = false },
+                title = { Text(stringResource(R.string.settings_title_language)) },
+                text = {
+                    Column {
+                        LanguageStore.options.forEachIndexed { index, code ->
+                            val label = stringResource(LanguageStore.labelRes(code))
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .gamepadFocusable(
+                                        autoFocus = index == 0,
+                                        onConfirm = {
+                                            current = code
+                                            showDialog = false
+                                            activity?.let { LanguageStore.applyAndRecreate(it, code) }
+                                        },
+                                        onBack = { showDialog = false }
+                                    )
+                                    .clickable {
+                                        current = code
+                                        showDialog = false
+                                        activity?.let { LanguageStore.applyAndRecreate(it, code) }
+                                    }
+                                    .padding(vertical = 12.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    label,
+                                    color = if (code == current) AeroTextPrimary else AeroTextSecondary,
+                                    modifier = Modifier.weight(1f)
+                                )
+                                if (code == current) {
+                                    Text(text = "✓", color = AeroTextPrimary)
+                                }
+                            }
+                        }
+                        DialogGamepadBar()
+                    }
+                },
+                confirmButton = {
+                    TextButton(
+                        onClick = { showDialog = false },
+                        modifier = Modifier.gamepadFocusable(
+                            onConfirm = { showDialog = false },
+                            onBack = { showDialog = false }
+                        )
+                    ) { Text(stringResource(R.string.common_cancel)) }
+                },
+                shape = RoundedCornerShape(20.dp)
+            )
+        }
     }
 }
 
@@ -735,9 +913,9 @@ private fun FlipIntervalRow(
         verticalAlignment = Alignment.CenterVertically
     ) {
         Column(modifier = Modifier.weight(1f)) {
-            Text(text = "Intervalo do flip", color = AeroTextPrimary)
+            Text(text = stringResource(R.string.settings_label_flip_interval), color = AeroTextPrimary)
             Text(
-                text = "Tempo parado na frente antes de virar.",
+                text = stringResource(R.string.settings_desc_flip_interval),
                 color = AeroTextSecondary,
                 fontSize = 13.sp
             )
@@ -807,14 +985,14 @@ private fun VolumeRow(
 private fun CreditsSettings(gamepadActive: Boolean, selectedCategory: String) {
     val context = androidx.compose.ui.platform.LocalContext.current
     val touchOk = LocalTouchActionsEnabled.current
-    val sections = remember { Credits.entries.groupBy { it.section } }
+    val sections = remember { Credits.entries().groupBy { context.getString(it.sectionRes) } }
     val firstSection = sections.keys.firstOrNull()
 
     fun openUrl(url: String) {
         runCatching {
             context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
         }.onFailure {
-            Toast.makeText(context, "Não consegui abrir o navegador", Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, context.getString(R.string.common_browser_failed), Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -824,13 +1002,13 @@ private fun CreditsSettings(gamepadActive: Boolean, selectedCategory: String) {
             .verticalScroll(rememberScrollState())
     ) {
         Text(
-            text = "Créditos",
+            text = stringResource(R.string.settings_category_credits),
             color = AeroTextPrimary,
             fontSize = 26.sp,
             modifier = Modifier.padding(bottom = 6.dp)
         )
         Text(
-            text = "Quem torna este app possível.",
+            text = stringResource(R.string.settings_desc_credits),
             color = AeroTextSecondary,
             fontSize = 14.sp,
             modifier = Modifier.padding(bottom = 18.dp)
@@ -863,7 +1041,7 @@ private fun CreditsSettings(gamepadActive: Boolean, selectedCategory: String) {
                 ) {
                     Column(modifier = Modifier.weight(1f)) {
                         Text(text = entry.name, color = AeroTextPrimary)
-                        Text(text = entry.detail, color = AeroTextSecondary, fontSize = 13.sp)
+                        Text(text = context.getString(entry.detailRes), color = AeroTextSecondary, fontSize = 13.sp)
                         if (entry.url != null) {
                             Text(
                                 text = entry.url,
@@ -929,14 +1107,14 @@ private fun AndroidGamePickerDialog(
     GamepadDialogScope {
         AlertDialog(
             onDismissRequest = onDismiss,
-            title = { Text("Adicionar aplicativo como jogo") },
+            title = { Text(stringResource(R.string.settings_dialog_add_app_title)) },
             text = {
                 Column {
                     OutlinedTextField(
                         value = query,
                         onValueChange = { query = it },
                         singleLine = true,
-                        placeholder = { Text("Pesquisar app...", fontSize = 13.sp) },
+                        placeholder = { Text(stringResource(R.string.settings_placeholder_search_app), fontSize = 13.sp) },
                         leadingIcon = { Text(text = "🔍", fontSize = 14.sp) },
                         modifier = Modifier
                             .fillMaxWidth()
@@ -944,9 +1122,9 @@ private fun AndroidGamePickerDialog(
                     )
                     LazyColumn(modifier = Modifier.height(280.dp)) {
                         if (apps.isEmpty()) {
-                            item { Text("Não encontrei aplicativos disponíveis.") }
+                            item { Text(stringResource(R.string.settings_empty_no_apps)) }
                         } else if (filtered.isEmpty()) {
-                            item { Text("Nada encontrado para \"${query.trim()}\".") }
+                            item { Text(stringResource(R.string.settings_empty_nothing_found_for_query_android, query.trim())) }
                         } else {
                             itemsIndexed(filtered, key = { _, it -> it.packageName }) { index, app ->
                                 Row(
@@ -976,7 +1154,7 @@ private fun AndroidGamePickerDialog(
                 TextButton(
                     onClick = onDismiss,
                     modifier = Modifier.gamepadFocusable(onConfirm = onDismiss, onBack = onDismiss)
-                ) { Text("Cancelar") }
+                ) { Text(stringResource(R.string.common_cancel)) }
             },
             shape = RoundedCornerShape(20.dp)
         )
@@ -1005,14 +1183,14 @@ private fun EmulatorPickerDialog(
     GamepadDialogScope {
         AlertDialog(
             onDismissRequest = onDismiss,
-            title = { Text("Emulador para $console") },
+            title = { Text(stringResource(R.string.settings_dialog_emulator_for_console, console)) },
             text = {
                 Column {
                     OutlinedTextField(
                         value = query,
                         onValueChange = { query = it },
                         singleLine = true,
-                        placeholder = { Text("Pesquisar app...", fontSize = 13.sp) },
+                        placeholder = { Text(stringResource(R.string.settings_placeholder_search_app), fontSize = 13.sp) },
                         leadingIcon = { Text(text = "🔍", fontSize = 14.sp) },
                         modifier = Modifier
                             .fillMaxWidth()
@@ -1021,10 +1199,10 @@ private fun EmulatorPickerDialog(
                     LazyColumn(modifier = Modifier.height(260.dp)) {
                         if (apps.isEmpty()) {
                             item {
-                                Text("Não encontrei aplicativos disponíveis para escolher.")
+                                Text(stringResource(R.string.settings_empty_no_apps_to_choose))
                             }
                         } else if (filtered.isEmpty()) {
-                            item { Text("Nada encontrado para \"${query.trim()}\".") }
+                            item { Text(stringResource(R.string.settings_empty_nothing_found_for_query_emulator, query.trim())) }
                         } else {
                             itemsIndexed(filtered, key = { _, it -> it.packageName }) { index, app ->
                                 val knownTarget = known[app.packageName]
@@ -1047,7 +1225,7 @@ private fun EmulatorPickerDialog(
                                         Text(app.packageName, color = AeroTextSecondary, fontSize = 11.sp)
                                     }
                                     if (knownTarget != null) {
-                                        Text("Suportado", color = AeroTextSecondary, fontSize = 11.sp)
+                                        Text(stringResource(R.string.settings_label_supported), color = AeroTextSecondary, fontSize = 11.sp)
                                     }
                                 }
                             }
@@ -1060,13 +1238,13 @@ private fun EmulatorPickerDialog(
                 TextButton(
                     onClick = onClear,
                     modifier = Modifier.gamepadFocusable(onConfirm = onClear, onBack = onDismiss)
-                ) { Text("Desconfigurar") }
+                ) { Text(stringResource(R.string.settings_action_clear_config)) }
             },
             dismissButton = {
                 TextButton(
                     onClick = onDismiss,
                     modifier = Modifier.gamepadFocusable(onConfirm = onDismiss, onBack = onDismiss)
-                ) { Text("Cancelar") }
+                ) { Text(stringResource(R.string.common_cancel)) }
             },
             shape = RoundedCornerShape(20.dp)
         )

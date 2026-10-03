@@ -1,0 +1,1178 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AeroStation · Estúdio de Temas</title><!--
+  Estúdio de Temas do AeroStation: crie temas no PC e importe no celular
+  (Ajustes > Temas > Importar .zip). Arquivo único, sem build: é só publicar
+  esta pasta no GitHub Pages (repo > Settings > Pages > Deploy from a branch
+  > main > /docs) e abrir o link. Roda até com duplo-clique local (file://)
+  e offline: o .zip é montado/lido em JS puro, sem CDN nem dependência
+  (exportação sem compressão + DecompressionStream nativa na importação).
+
+  Formato gerado == formato que o app lê (ThemeStore.importFromZip):
+  - theme.json na raiz: {id, name, colors{11×ARGB}, backgroundImage, music,
+    sounds{move,confirm,open,close,launch}} (mídias = nomes de arquivo ou null)
+  - mídias na raiz, nomes simples [A-Za-z0-9._-]: bg.<img|vídeo>,
+    music.<áudio>, <slot>.<áudio>. O app dá um id novo na importação
+    (nunca sobrescreve).
+-->
+<style>
+  :root{
+    --bg0:#0d2137; --bg1:#123653;
+    --glass:rgba(255,255,255,.10); --glass2:rgba(255,255,255,.18);
+    --line:rgba(255,255,255,.35); --txt:#fff; --sub:rgba(255,255,255,.7);
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0; font-family:"Segoe UI",system-ui,Roboto,Arial,sans-serif; color:var(--txt);
+    background:linear-gradient(180deg,var(--bg0),var(--bg1) 60%,#0a4f5c);
+    min-height:100vh;
+  }
+  header{
+    display:flex; gap:12px; align-items:center; flex-wrap:wrap;
+    padding:18px 26px; border-bottom:1px solid var(--line);
+    background:rgba(0,0,0,.25); position:sticky; top:0; z-index:5;
+    backdrop-filter:blur(8px);
+  }
+  header h1{font-size:20px; margin:0 8px 0 0}
+  header p{margin:0; color:var(--sub); font-size:13px; flex:1 1 220px}
+  button,.btn{
+    background:var(--glass2); color:var(--txt); border:1px solid var(--line);
+    border-radius:999px; padding:9px 18px; font-size:14px; cursor:pointer;
+  }
+  button:hover,.btn:hover{background:rgba(255,255,255,.28)}
+  button:disabled{opacity:.4; cursor:default}
+  button.primary{background:#2e86ab; border-color:#7fd6c4}
+  #libwarn{
+    display:none; margin:14px 26px 0; padding:12px 16px; border-radius:12px;
+    background:rgba(229,72,77,.25); border:1px solid #e5484d; font-size:14px;
+  }
+  #langsw{display:flex; gap:6px}
+  #langsw .langbtn.on{background:#2e86ab; border-color:#7fd6c4}
+  main{
+    display:grid; grid-template-columns:minmax(340px,520px) minmax(0,600px);
+    gap:26px; padding:22px 26px 60px; max-width:1240px; margin:0 auto;
+    align-items:start;
+  }
+  @media (max-width:1100px){ main{grid-template-columns:1fr} .phonewrap{position:static} }
+  section.card{
+    background:var(--glass); border:1px solid var(--line); border-radius:16px;
+    padding:16px; margin-bottom:16px;
+  }
+  section.card h2{margin:0 0 4px; font-size:17px}
+  section.card .hint{margin:0 0 12px; color:var(--sub); font-size:13px}
+  label.field{display:block; font-size:13px; color:var(--sub); margin:0 0 4px}
+  input[type=text]{
+    width:100%; padding:10px 12px; border-radius:10px; font-size:15px;
+    border:1px solid var(--line); background:rgba(0,0,0,.3); color:var(--txt);
+  }
+  .colorrow{
+    background:rgba(0,0,0,.22); border:1px solid var(--line);
+    border-radius:14px; padding:12px; margin-bottom:10px;
+  }
+  .colorrow .top{display:flex; align-items:center; gap:10px}
+  .swatch{
+    width:38px; height:38px; border-radius:10px; border:1px solid var(--line);
+    flex:none;
+  }
+  .colorrow .top b{flex:1; font-size:15px}
+  .colorrow .controls{display:flex; gap:10px; align-items:center; margin-top:10px; flex-wrap:wrap}
+  .colorrow input[type=color]{
+    width:52px; height:36px; border:1px solid var(--line); border-radius:8px;
+    background:none; padding:2px; cursor:pointer;
+  }
+  .colorrow input[type=text]{width:130px; font-family:Consolas,monospace}
+  .colorrow input[type=range]{flex:1; min-width:120px; accent-color:#7fd6c4}
+  .colorrow details{margin-top:8px}
+  .colorrow summary{cursor:pointer; color:var(--sub); font-size:13px}
+  .presets{display:flex; gap:6px; flex-wrap:wrap; margin-top:8px}
+  .presets button{
+    width:28px; height:28px; border-radius:8px; padding:0;
+    border:1px solid var(--line);
+  }
+  .presets button.sel{outline:2px solid #fff}
+  .mediarow{
+    display:flex; gap:10px; align-items:center;
+    background:rgba(0,0,0,.22); border:1px solid var(--line);
+    border-radius:14px; padding:12px; margin-bottom:8px;
+  }
+  .mediarow img{width:52px; height:52px; object-fit:cover; border-radius:9px; flex:none}
+  .mediarow .info{flex:1; min-width:0}
+  .mediarow .info b{display:block; font-size:14px}
+  .mediarow .info span{color:var(--sub); font-size:12px; word-break:break-all}
+  .mediarow audio{width:100%; height:30px; margin-top:6px}
+  .mini{font-size:12px; padding:6px 12px}
+  input[type=file]{display:none}
+  /* Prévia dos botões do controle */
+  .padprev{
+    width:56px; height:56px; border-radius:50%; flex:none; position:relative;
+    background:linear-gradient(rgba(255,255,255,.4),rgba(255,255,255,.2));
+    border:1px solid var(--line); overflow:hidden;
+    display:flex; align-items:center; justify-content:center;
+  }
+  .padprev img{width:100%; height:100%; object-fit:contain}
+  .padprev .pglyph{font-weight:700; font-size:17px}
+  .padprev .plabel{
+    position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
+    font-weight:700; font-size:15px; color:#fff; text-shadow:0 1px 3px rgba(0,0,0,.6);
+  }
+  .padrow{background:rgba(0,0,0,.22); border:1px solid var(--line); border-radius:14px; padding:12px; margin-bottom:10px}
+  .padrow .top{display:flex; align-items:center; gap:10px}
+  .padrow .top b{flex:1; font-size:15px}
+  .padrow .modes{display:flex; gap:6px; margin-top:10px}
+  .padrow .modes button.on{background:rgba(255,255,255,.28)}
+  .padrow .shapes{display:flex; gap:6px; flex-wrap:wrap; margin-top:8px}
+  .padrow .shapes button.on{outline:2px solid #fff}
+  .padrow .crow{display:flex; gap:8px; align-items:center; margin-top:8px}
+  .padrow input[type=color]{width:46px; height:32px; border:1px solid var(--line); border-radius:8px; background:none; padding:2px; cursor:pointer}
+  .padrow input[type=text]{width:110px; font-family:Consolas,monospace}
+  .padrow input[type=range]{flex:1; accent-color:#7fd6c4}
+  .padrow label.chk{display:flex; gap:6px; align-items:center; font-size:13px; color:var(--sub); margin-top:8px; cursor:pointer}
+  /* Prévia em paisagem, que nem o app (sensorLandscape) */
+  .phonewrap{position:sticky; top:96px}
+  .phone{
+    width:100%; max-width:560px; height:320px; border-radius:22px; overflow:hidden; position:relative;
+    border:2px solid rgba(255,255,255,.5); margin:0 auto;
+    box-shadow:0 18px 50px rgba(0,0,0,.5); background:#000;
+  }
+  .phone .bg{position:absolute; inset:0}
+  .phone .bg img{width:100%; height:100%; object-fit:cover; display:none}
+  .phone .bg video{width:100%; height:100%; object-fit:cover; display:none}
+  .phone .scrim{position:absolute; inset:0; background:rgba(0,0,0,.38); display:none}
+  .phone .tint{position:absolute; inset:0; opacity:.55}
+  .phone .content{position:absolute; inset:0; padding:20px 16px}
+  .phone .p-title{font-size:22px; font-weight:700}
+  .phone .p-sub{font-size:12px; margin-top:2px}
+  .phone .p-card{
+    margin-top:14px; border-radius:14px; padding:12px;
+    border:1px solid;
+  }
+  .phone .p-card b{font-size:14px}
+  .phone .p-card span{display:block; font-size:11px; margin-top:2px}
+  .phone .p-dots{display:flex; gap:8px; margin-top:12px}
+  .phone .p-dots i{width:26px; height:26px; border-radius:50%}
+  .phone .p-nav{
+    position:absolute; left:0; right:0; bottom:14px;
+    display:flex; gap:6px; justify-content:center;
+  }
+  .phone .p-nav em{
+    font-style:normal; font-size:10px; border-radius:999px; padding:5px 10px;
+    background:rgba(255,255,255,.22); border:1px solid rgba(255,255,255,.5);
+  }
+  footer{max-width:1240px; margin:0 auto; padding:0 26px 40px; color:var(--sub); font-size:13px}
+</style>
+</head>
+<body>
+<header>
+  <h1 data-i18n="studio">🎨 Estúdio de Temas</h1>
+  <p data-i18n="header_sub">AeroStation · crie no PC, importe no celular em Ajustes &gt; Temas &gt; Importar .zip</p>
+  <span id="langsw" role="group" aria-label="Language / Idioma">
+    <button class="mini langbtn" data-lang="pt">PT</button><button class="mini langbtn" data-lang="en">EN</button><button class="mini langbtn" data-lang="es">ES</button>
+  </span>
+  <label class="btn" for="importzip" data-i18n="import">⤓ Importar .zip</label>
+  <input type="file" id="importzip" accept=".zip,.aerotheme.zip,application/zip">
+  <button class="primary" id="exportbtn" data-i18n="export">⤒ Exportar .zip</button>
+</header>
+<div id="libwarn" data-i18n="libwarn">⚠️ Seu navegador não tem descompressão nativa (DecompressionStream) — importar zips vindos do app pode falhar. Use Chrome/Edge/Firefox atual. Exportar funciona normal.</div>
+<main>
+  <div id="form">
+    <section class="card">
+      <h2 data-i18n="sec_name">Nome</h2>
+      <p class="hint" data-i18n="sec_name_hint">Como o tema aparece na lista do celular.</p>
+      <input type="text" id="themename" value="Meu tema" maxlength="40">
+    </section>
+    <section class="card">
+      <h2 data-i18n="sec_colors">Cores</h2>
+      <p class="hint" data-i18n="sec_colors_hint">Seletor = tom · barra = transparência · campo = hexadecimal AARRGGBB.</p>
+      <div id="colors"></div>
+    </section>
+    <section class="card">
+      <h2 data-i18n="sec_bg">Fundo animado</h2>
+      <p class="hint" data-i18n="sec_bg_hint">Opcional: foto, GIF animado ou vídeo curto (roda em loop, sem som). Foto: jpg, png, webp, gif, bmp · vídeo: mp4, webm, mov...</p>
+      <div class="mediarow">
+        <img id="bgthumb" alt="" style="display:none">
+        <div class="info"><b data-i18n="bg">Fundo</b><span id="bgname">Padrão do app</span></div>
+        <label class="btn mini" for="bgfile" data-i18n="choose">Escolher</label>
+        <input type="file" id="bgfile" accept="image/*,video/*">
+        <button class="mini" id="bgclear" disabled data-i18n="app_default">Padrão</button>
+      </div>
+      <div class="mediarow" id="bgfitrow" style="display:none">
+        <div class="info"><b data-i18n="bg_fit">Ajuste</b><span data-i18n="bg_fit_hint">Como o fundo preenche a tela</span></div>
+        <button class="mini" id="bgfitcrop" data-i18n="fill">Preencher</button>
+        <button class="mini" id="bgfitfit" data-i18n="fit">Ajustar</button>
+      </div>
+    </section>
+    <section class="card">
+      <h2 data-i18n="sec_music">Música de fundo</h2>
+      <p class="hint" data-i18n="sec_music_hint">Opcional, em looping (mp3, wav, ogg, m4a, flac...).</p>
+      <div class="mediarow">
+        <div class="info"><b data-i18n="music">Música</b><span id="musicname">Padrão do app</span>
+          <audio id="musicprev" controls loop style="display:none"></audio>
+        </div>
+        <label class="btn mini" for="musicfile" data-i18n="choose">Escolher</label>
+        <input type="file" id="musicfile" accept="audio/*">
+        <button class="mini" id="musicclear" disabled data-i18n="app_default">Padrão</button>
+      </div>
+    </section>
+    <section class="card">
+      <h2 data-i18n="sec_sfx">Efeitos sonoros</h2>
+      <p class="hint" data-i18n="sec_sfx_hint">Opcional, um por slot. ▶ escuta na hora; o que ficar vazio usa o som original.</p>
+      <div id="sfx"></div>
+    </section>
+    <section class="card">
+      <h2 data-i18n="sec_pad">Aparência dos controles</h2>
+      <p class="hint"><span data-i18n="sec_pad_hint">A roupa dos botões do controle virtual (A/B/X/Y, setas, L1/R1). Forma usa a cor; imagem é um PNG seu que substitui o botão inteiro.</span> <span id="padcount"></span></p>
+      <div id="padbuttons"></div>
+      <button class="mini" id="padreset" data-i18n="pad_reset">Redefinir controles</button>
+    </section>
+  </div>
+  <div class="phonewrap">
+    <div class="phone" data-i18n-aria="preview_aria" aria-label="Prévia do tema">
+      <div class="bg"><img id="p-bgimg" alt=""><video id="p-bgvid" loop muted playsinline></video></div>
+      <div class="scrim" id="p-scrim"></div>
+      <div class="tint" id="p-tint"></div>
+      <div class="content">
+        <div class="p-title" id="p-title">Meu tema</div>
+        <div class="p-sub" id="p-sub" data-i18n="preview_sub">Só um testezinho do seu tema</div>
+        <div class="p-card" id="p-card">
+          <b id="p-cardtitle" data-i18n="preview_card">Vidro</b>
+          <span id="p-cardsub" data-i18n="preview_cardsub">Cartuchos, botões e janelas</span>
+        </div>
+        <div class="p-dots"><i id="p-leaf"></i><i id="p-accent"></i></div>
+      </div>
+      <div class="p-nav"><em data-i18n="nav_home">Início</em><em data-i18n="nav_played">Jogados</em><em data-i18n="nav_gallery">Álbum</em></div>
+    </div>
+  </div>
+</main>
+<footer data-i18n="footer">Formato 100% compatível com o app — o celular dá um id novo na importação, sem sobrescrever nada. Áudios do zip são normalizados na importação (música→m4a, efeitos→wav). Dica: exporte o “Aero Padrão” no app e abra aqui pra remixar. 🛝</footer>
+
+<script>
+"use strict";
+/* ===== Idioma (PT/EN/ES, com seletor no topo) ===== */
+var LANGS=["pt","en","es"];
+var lang="pt";
+var I18N={
+pt:{
+studio:"🎨 Estúdio de Temas",studio_title:"Estúdio de Temas",
+header_sub:"AeroStation · crie no PC, importe no celular em Ajustes > Temas > Importar .zip",
+import:"⤓ Importar .zip",export:"⤒ Exportar .zip",
+libwarn:"⚠️ Seu navegador não tem descompressão nativa (DecompressionStream) — importar zips vindos do app pode falhar. Use Chrome/Edge/Firefox atual. Exportar funciona normal.",
+sec_name:"Nome",sec_name_hint:"Como o tema aparece na lista do celular.",
+sec_colors:"Cores",sec_colors_hint:"Seletor = tom · barra = transparência · campo = hexadecimal AARRGGBB.",
+sec_bg:"Fundo animado",sec_bg_hint:"Opcional: foto, GIF animado ou vídeo curto (roda em loop, sem som). Foto: jpg, png, webp, gif, bmp · vídeo: mp4, webm, mov...",
+bg:"Fundo",app_default:"Padrão do app",choose:"Escolher",
+bg_fit:"Ajuste",bg_fit_hint:"Como o fundo preenche a tela",fill:"Preencher",fit:"Ajustar",
+sec_music:"Música de fundo",sec_music_hint:"Opcional, em looping (mp3, wav, ogg, m4a, flac...).",music:"Música",
+sec_sfx:"Efeitos sonoros",sec_sfx_hint:"Opcional, um por slot. ▶ escuta na hora; o que ficar vazio usa o som original.",
+sec_pad:"Aparência dos controles",sec_pad_hint:"A roupa dos botões do controle virtual (A/B/X/Y, setas, L1/R1). Forma usa a cor; imagem é um PNG seu que substitui o botão inteiro.",
+pad_reset:"Redefinir controles",
+preview_sub:"Só um testezinho do seu tema",preview_card:"Vidro",preview_cardsub:"Cartuchos, botões e janelas",
+nav_home:"Início",nav_played:"Jogados",nav_gallery:"Álbum",preview_aria:"Prévia do tema",
+footer:"Formato 100% compatível com o app — o celular dá um id novo na importação, sem sobrescrever nada. Áudios do zip são normalizados na importação (música→m4a, efeitos→wav). Dica: exporte o “Aero Padrão” no app e abra aqui pra remixar. 🛝",
+ready_colors:"Cores prontas",show_letter:"Mostrar letra",
+no_image_yet:"Nenhuma imagem ainda — vale o padrão até escolher.",
+choose_image:"Escolher imagem",mode_default:"Padrão",mode_shape:"Forma",mode_image:"Imagem",
+padcount_none:"(nenhum botão customizado — o zip sai sem skins)",
+padcount_some:"({n}/10 botões customizados — vão no zip)",
+alert_format:"Formato não suportado: {f}\nUse: {exts}",
+alert_too_big:"Arquivo grande demais (máx 100MB).",
+alert_not_zip:"Isso não parece um zip válido.",
+alert_no_manifest:"Isso não parece um tema (sem theme.json na raiz).",
+alert_bad_manifest:"theme.json inválido.",
+alert_bad_zip:"Zip inválido ou corrompido.",
+alert_export_fail:"Falha montando o zip.",
+default_theme_name:"Meu tema",untitled:"Sem nome",
+color_sky_top:"Céu (topo)",color_sky_mid:"Céu (meio)",color_sky_bottom:"Água (base)",
+color_leaf:"Verde folha",color_glass:"Vidro",color_glass_strong:"Vidro forte",
+color_glass_border:"Borda do vidro",color_highlight:"Brilho",
+color_text_primary:"Texto principal",color_text_secondary:"Texto secundário",
+color_accent:"Laranja destaque",
+sfx_move:"Cursor (navegar)",sfx_confirm:"Confirmar (A)",sfx_open:"Abrir janela",
+sfx_close:"Fechar janela",sfx_launch:"Iniciar jogo/app",
+pad_a:"Botão A",pad_b:"Botão B",pad_x:"Botão X",pad_y:"Botão Y",
+pad_up:"Seta ↑",pad_down:"Seta ↓",pad_left:"Seta ←",pad_right:"Seta →",
+pad_l1:"L1",pad_r1:"R1",
+shape_circle:"Bola",shape_square:"Quadrado",shape_triangle:"Triângulo",
+shape_diamond:"Losango",shape_star:"Estrela"
+},
+en:{
+studio:"🎨 Theme Studio",studio_title:"Theme Studio",
+header_sub:"AeroStation · create on PC, import on your phone in Settings > Themes > Import .zip",
+import:"⤓ Import .zip",export:"⤒ Export .zip",
+libwarn:"⚠️ Your browser has no native decompression (DecompressionStream) — importing zips from the app may fail. Use an up-to-date Chrome/Edge/Firefox. Export works fine.",
+sec_name:"Name",sec_name_hint:"How the theme shows up in the phone list.",
+sec_colors:"Colors",sec_colors_hint:"Picker = hue · slider = transparency · field = AARRGGBB hex.",
+sec_bg:"Animated background",sec_bg_hint:"Optional: photo, animated GIF or short video (loops, no sound). Photo: jpg, png, webp, gif, bmp · video: mp4, webm, mov...",
+bg:"Background",app_default:"App default",choose:"Choose",
+bg_fit:"Fit",bg_fit_hint:"How the background fills the screen",fill:"Fill",fit:"Fit",
+sec_music:"Background music",sec_music_hint:"Optional, looping (mp3, wav, ogg, m4a, flac...).",music:"Music",
+sec_sfx:"Sound effects",sec_sfx_hint:"Optional, one per slot. ▶ previews instantly; empty slots use the original sound.",
+sec_pad:"Controller look",sec_pad_hint:"The virtual controller buttons' outfit (A/B/X/Y, d-pad, L1/R1). Shape uses the color; image is your own PNG replacing the whole button.",
+pad_reset:"Reset controls",
+preview_sub:"Just a little test of your theme",preview_card:"Glass",preview_cardsub:"Cartridges, buttons and windows",
+nav_home:"Home",nav_played:"Played",nav_gallery:"Album",preview_aria:"Theme preview",
+footer:"100% app-compatible format — the phone assigns a new id on import, never overwriting. Zip audio is normalized on import (music→m4a, effects→wav). Tip: export “Default Aero” in the app and open it here to remix. 🛝",
+ready_colors:"Ready-made colors",show_letter:"Show letter",
+no_image_yet:"No image yet — default applies until you pick one.",
+choose_image:"Choose image",mode_default:"Default",mode_shape:"Shape",mode_image:"Image",
+padcount_none:"(no customized buttons — the zip ships without skins)",
+padcount_some:"({n}/10 customized buttons — included in the zip)",
+alert_format:"Unsupported format: {f}\nUse: {exts}",
+alert_too_big:"File too big (max 100MB).",
+alert_not_zip:"That doesn't look like a valid zip.",
+alert_no_manifest:"That doesn't look like a theme (no root theme.json).",
+alert_bad_manifest:"Invalid theme.json.",
+alert_bad_zip:"Invalid or corrupted zip.",
+alert_export_fail:"Failed building the zip.",
+default_theme_name:"My theme",untitled:"Untitled",
+color_sky_top:"Sky (top)",color_sky_mid:"Sky (middle)",color_sky_bottom:"Water (base)",
+color_leaf:"Leaf green",color_glass:"Glass",color_glass_strong:"Strong glass",
+color_glass_border:"Glass border",color_highlight:"Glow",
+color_text_primary:"Main text",color_text_secondary:"Secondary text",
+color_accent:"Accent orange",
+sfx_move:"Cursor (navigate)",sfx_confirm:"Confirm (A)",sfx_open:"Open window",
+sfx_close:"Close window",sfx_launch:"Launch game/app",
+pad_a:"Button A",pad_b:"Button B",pad_x:"Button X",pad_y:"Button Y",
+pad_up:"Up arrow",pad_down:"Down arrow",pad_left:"Left arrow",pad_right:"Right arrow",
+pad_l1:"L1",pad_r1:"R1",
+shape_circle:"Ball",shape_square:"Square",shape_triangle:"Triangle",
+shape_diamond:"Diamond",shape_star:"Star"
+},
+es:{
+studio:"🎨 Estudio de temas",studio_title:"Estudio de temas",
+header_sub:"AeroStation · crea en el PC, importa en el móvil en Ajustes > Temas > Importar .zip",
+import:"⤓ Importar .zip",export:"⤒ Exportar .zip",
+libwarn:"⚠️ Tu navegador no tiene descompresión nativa (DecompressionStream) — importar zips de la app puede fallar. Usa Chrome/Edge/Firefox actual. Exportar funciona bien.",
+sec_name:"Nombre",sec_name_hint:"Cómo aparece el tema en la lista del móvil.",
+sec_colors:"Colores",sec_colors_hint:"Selector = tono · barra = transparencia · campo = hexadecimal AARRGGBB.",
+sec_bg:"Fondo animado",sec_bg_hint:"Opcional: foto, GIF animado o video corto (en loop, sin sonido). Foto: jpg, png, webp, gif, bmp · vídeo: mp4, webm, mov...",
+bg:"Fondo",app_default:"Por defecto de la app",choose:"Elegir",
+bg_fit:"Ajuste",bg_fit_hint:"Cómo el fondo llena la pantalla",fill:"Rellenar",fit:"Ajustar",
+sec_music:"Música de fondo",sec_music_hint:"Opcional, en loop (mp3, wav, ogg, m4a, flac...).",music:"Música",
+sec_sfx:"Efectos de sonido",sec_sfx_hint:"Opcional, uno por slot. ▶ escucha al momento; lo vacío usa el sonido original.",
+sec_pad:"Apariencia de los controles",sec_pad_hint:"La ropa de los botones del control virtual (A/B/X/Y, flechas, L1/R1). Forma usa el color; imagen es un PNG tuyo que reemplaza todo el botón.",
+pad_reset:"Restablecer controles",
+preview_sub:"Solo una probadita de tu tema",preview_card:"Vidrio",preview_cardsub:"Cartuchos, botones y ventanas",
+nav_home:"Inicio",nav_played:"Jugados",nav_gallery:"Álbum",preview_aria:"Vista previa del tema",
+footer:"Formato 100% compatible con la app — el móvil asigna un id nuevo al importar, sin sobrescribir. El audio del zip se normaliza al importar (música→m4a, efectos→wav). Consejo: exporta “Aero por defecto” en la app y ábrelo aquí para remezclar. 🛝",
+ready_colors:"Colores listos",show_letter:"Mostrar letra",
+no_image_yet:"Ninguna imagen aún — vale el valor por defecto hasta elegir.",
+choose_image:"Elegir imagen",mode_default:"Por defecto",mode_shape:"Forma",mode_image:"Imagen",
+padcount_none:"(ningún botón personalizado — el zip sale sin skins)",
+padcount_some:"({n}/10 botones personalizados — van en el zip)",
+alert_format:"Formato no soportado: {f}\nUsa: {exts}",
+alert_too_big:"Archivo demasiado grande (máx 100MB).",
+alert_not_zip:"Eso no parece un zip válido.",
+alert_no_manifest:"Eso no parece un tema (sin theme.json en la raíz).",
+alert_bad_manifest:"theme.json inválido.",
+alert_bad_zip:"Zip inválido o dañado.",
+alert_export_fail:"Fallo al armar el zip.",
+default_theme_name:"Mi tema",untitled:"Sin nombre",
+color_sky_top:"Cielo (arriba)",color_sky_mid:"Cielo (medio)",color_sky_bottom:"Agua (base)",
+color_leaf:"Verde hoja",color_glass:"Vidrio",color_glass_strong:"Vidrio fuerte",
+color_glass_border:"Borde del vidrio",color_highlight:"Brillo",
+color_text_primary:"Texto principal",color_text_secondary:"Texto secundario",
+color_accent:"Naranja destacado",
+sfx_move:"Cursor (navegar)",sfx_confirm:"Confirmar (A)",sfx_open:"Abrir ventana",
+sfx_close:"Cerrar ventana",sfx_launch:"Iniciar juego/app",
+pad_a:"Botón A",pad_b:"Botón B",pad_x:"Botón X",pad_y:"Botón Y",
+pad_up:"Flecha ↑",pad_down:"Flecha ↓",pad_left:"Flecha ←",pad_right:"Flecha →",
+pad_l1:"L1",pad_r1:"R1",
+shape_circle:"Bola",shape_square:"Cuadrado",shape_triangle:"Triángulo",
+shape_diamond:"Rombo",shape_star:"Estrella"
+}};
+function t(k,p){ var d=I18N[lang]||I18N.pt; var s=(d[k]!==undefined)?d[k]:I18N.pt[k]; if(s===undefined) return k; if(p){ for(var k2 in p){ s=s.split("{"+k2+"}").join(p[k2]); } } return s; }
+var DEFAULT_THEME_NAMES=["Meu tema","My theme","Mi tema"];
+function applyLang(l){
+  if(LANGS.indexOf(l)<0) l="pt";
+  lang=l;
+  try{ localStorage.setItem("aerostation-lang",l); }catch(e){}
+  document.documentElement.lang=(l==="pt")?"pt-BR":l;
+  document.title="AeroStation · "+t("studio_title");
+  var els=document.querySelectorAll("[data-i18n]");
+  for(var i=0;i<els.length;i++){ els[i].textContent=t(els[i].getAttribute("data-i18n")); }
+  var aria=document.querySelectorAll("[data-i18n-aria]");
+  for(var j=0;j<aria.length;j++){ aria[j].setAttribute("aria-label",t(aria[j].getAttribute("data-i18n-aria"))); }
+  var btns=document.querySelectorAll("#langsw .langbtn");
+  for(var k=0;k<btns.length;k++){ if(btns[k].dataset.lang===l) btns[k].classList.add("on"); else btns[k].classList.remove("on"); }
+  if(DEFAULT_THEME_NAMES.indexOf(state.name)>=0){ state.name=t("default_theme_name"); $("themename").value=state.name; }
+  buildColors(); buildSfx();
+  SFX_SLOTS.forEach(function(pair){ setSfx(pair[0],state.sounds[pair[0]]||null); });
+  buildPadButtons();
+  $("bgname").textContent=state.bg? state.bg.name : t("app_default");
+  $("musicname").textContent=state.music? state.music.name : t("app_default");
+  refreshPreview();
+}
+function detectLang(){
+  try{ var s=localStorage.getItem("aerostation-lang"); if(s&&LANGS.indexOf(s)>=0) return s; }catch(e){}
+  var n=(navigator.language||"en").toLowerCase();
+  if(n.indexOf("pt")===0) return "pt";
+  if(n.indexOf("es")===0) return "es";
+  return "en";
+}
+/* ===== Formato (espelho de AppTheme.kt / ThemeStore.kt) ===== */
+var DEFAULTS = {
+  skyTop:0xFF1E4E8C, skyMid:0xFF2E86AB, skyBottom:0xFF6FD6C4,
+  leafGreen:0xFF8FD14F, glassWhite:0x33FFFFFF, glassWhiteStrong:0x66FFFFFF,
+  glassBorder:0x80FFFFFF, highlight:0xFFE8FFF8,
+  textPrimary:0xFFFFFFFF, textSecondary:0xB3FFFFFF, accentOrange:0xFFFFA451
+};
+var COLOR_KEYS = [
+  ["skyTop","color_sky_top"],["skyMid","color_sky_mid"],["skyBottom","color_sky_bottom"],
+  ["leafGreen","color_leaf"],["glassWhite","color_glass"],["glassWhiteStrong","color_glass_strong"],
+  ["glassBorder","color_glass_border"],["highlight","color_highlight"],
+  ["textPrimary","color_text_primary"],["textSecondary","color_text_secondary"],
+  ["accentOrange","color_accent"]
+];
+var SFX_SLOTS = [
+  ["move","sfx_move"],["confirm","sfx_confirm"],["open","sfx_open"],
+  ["close","sfx_close"],["launch","sfx_launch"]
+];
+var PRESETS = [
+  0xFFFFFFFF,0xFF000000,0xFF1E4E8C,0xFF2E86AB,0xFF6FD6C4,
+  0xFF8FD14F,0xFFFFA451,0xFFE5484D,0xFF9B5DE5,0xFFF15BB5,
+  0xFFFFE440,0xFF00BBF9,0x33FFFFFF,0x66FFFFFF,0x80FFFFFF,
+  0xFFE8FFF8,0xB3FFFFFF,0xFF2B2D42,0xFF121212,0xFF5A189A
+];
+var IMAGE_EXTS = ["jpg","jpeg","png","webp","gif","bmp"];
+var VIDEO_EXTS = ["mp4","mkv","webm","3gp","mov","avi"];
+var BG_EXTS = IMAGE_EXTS.concat(VIDEO_EXTS);
+var AUDIO_EXTS = ["mp3","wav","ogg","m4a","flac","opus","mid","midi"];
+function isVideoExt(e){ return VIDEO_EXTS.indexOf(e)>=0; }
+
+var state = {
+  name:"Meu tema",
+  colors:Object.assign({}, DEFAULTS),
+  bg:null,    // {name, ext, data:Uint8Array, url}
+  bgFit:"crop", // crop = preencher (corta) | fit = ajustar (faixas)
+  music:null,
+  sounds:{}   // slot -> {name, ext, data, url}
+  // (skins do controle moram no padState global, editável na seção Controles)
+};
+
+/* ===== Utils ===== */
+function toHex8(n){ return (n>>>0).toString(16).toUpperCase().padStart(8,"0"); }
+function css(n){
+  var a=((n>>>24)&255)/255, r=(n>>>16)&255, g=(n>>>8)&255, b=n&255;
+  return "rgba("+r+","+g+","+b+","+a.toFixed(3)+")";
+}
+function cssOpaque(n){
+  return "#"+((n&0xFFFFFF).toString(16).toUpperCase().padStart(6,"0"));
+}
+function parseHex(s){
+  s=(s||"").trim().replace(/^#/,"").replace(/^0x/i,"");
+  if(s.length!==6 && s.length!==8) return null;
+  if(!/^[0-9a-fA-F]+$/.test(s)) return null;
+  if(s.length===6) s="FF"+s;
+  var v=parseInt(s,16);
+  return isFinite(v)? v>>>0 : null;
+}
+function extOf(filename){
+  var parts=(filename||"").toLowerCase().split(".");
+  if(parts.length<2) return "";
+  var e=parts.pop();
+  return /^[a-z0-9]{2,5}$/.test(e)? e : "";
+}
+function $(id){ return document.getElementById(id); }
+
+/* ===== Prévia ===== */
+function syncBgFitButtons(){
+  $("bgfitrow").style.display=state.bg? "flex" : "none";
+  var cropBtn=$("bgfitcrop"), fitBtn=$("bgfitfit");
+  var isFit=state.bgFit==="fit";
+  cropBtn.style.background=isFit? "" : "rgba(255,255,255,.28)";
+  fitBtn.style.background=isFit? "rgba(255,255,255,.28)" : "";
+  refreshPreview();
+}
+function refreshPreview(){
+  var c=state.colors;
+  $("p-title").textContent=state.name||"Sem nome";
+  $("p-title").style.color=css(c.textPrimary);
+  $("p-sub").style.color=css(c.textSecondary);
+  var card=$("p-card");
+  card.style.background=css(c.glassWhiteStrong);
+  card.style.borderColor=css(c.glassBorder);
+  $("p-cardtitle").style.color=css(c.textPrimary);
+  $("p-cardsub").style.color=css(c.textSecondary);
+  $("p-leaf").style.background=css(c.leafGreen);
+  $("p-accent").style.background=css(c.accentOrange);
+  var tint=$("p-tint");
+  tint.style.background="linear-gradient("+css(c.skyTop)+","+css(c.skyMid)+","+css(c.skyBottom)+")";
+  tint.style.opacity=state.bg? "0.55" : "1";
+  var img=$("p-bgimg"), vid=$("p-bgvid"), scrim=$("p-scrim");
+  var fit=(state.bgFit==="fit")? "contain" : "cover";
+  img.style.objectFit=fit; vid.style.objectFit=fit;
+  if(state.bg){
+    scrim.style.display="block";
+    if(isVideoExt(state.bg.ext)){
+      img.style.display="none";
+      vid.src=state.bg.url; vid.style.display="block";
+      vid.play().catch(function(){});
+    }else{
+      vid.pause(); vid.removeAttribute("src"); vid.style.display="none";
+      img.src=state.bg.url; img.style.display="block";
+    }
+  }
+  else{
+    img.style.display="none";
+    vid.pause(); vid.removeAttribute("src"); vid.style.display="none";
+    scrim.style.display="none";
+  }
+}
+
+/* ===== Cores: monta as 11 fileiras ===== */
+function buildColors(){
+  var host=$("colors"); host.innerHTML="";
+  COLOR_KEYS.forEach(function(pair){
+    var key=pair[0], label=t(pair[1]);
+    var row=document.createElement("div"); row.className="colorrow";
+    var top=document.createElement("div"); top.className="top";
+    var sw=document.createElement("div"); sw.className="swatch"; sw.id="sw-"+key;
+    var b=document.createElement("b"); b.textContent=label;
+    top.appendChild(sw); top.appendChild(b); row.appendChild(top);
+    var ctl=document.createElement("div"); ctl.className="controls";
+    var pick=document.createElement("input"); pick.type="color"; pick.id="pick-"+key;
+    pick.addEventListener("input",function(){
+      var rgb=parseInt(pick.value.slice(1),16);
+      var cur=state.colors[key]>>>0;
+      state.colors[key]=(((cur>>>24)&255)<<24|rgb)>>>0;
+      syncColorRow(key);
+    });
+    var alpha=document.createElement("input"); alpha.type="range";
+    alpha.min="0"; alpha.max="255"; alpha.id="alpha-"+key;
+    alpha.addEventListener("input",function(){
+      var cur=state.colors[key]>>>0;
+      state.colors[key]=(( (+alpha.value)<<24)|(cur&0xFFFFFF))>>>0;
+      syncColorRow(key);
+    });
+    var hex=document.createElement("input"); hex.type="text"; hex.id="hex-"+key;
+    hex.maxLength=8; hex.spellcheck=false; hex.placeholder="AARRGGBB";
+    hex.addEventListener("input",function(){
+      var clean=hex.value.toUpperCase().replace(/[^0-9A-F]/g,"").slice(0,8);
+      if(clean!==hex.value) hex.value=clean;
+      var v=parseHex(clean);
+      if(v!==null){ state.colors[key]=v; syncColorRow(key,true); }
+    });
+    ctl.appendChild(pick); ctl.appendChild(alpha); ctl.appendChild(hex);
+    row.appendChild(ctl);
+    var det=document.createElement("details");
+    var sum=document.createElement("summary"); sum.textContent=t("ready_colors");
+    det.appendChild(sum);
+    var pr=document.createElement("div"); pr.className="presets";
+    PRESETS.forEach(function(p){
+      var pb=document.createElement("button");
+      pb.style.background=css(p); pb.title="#"+toHex8(p);
+      pb.dataset.preset=toHex8(p); pb.dataset.key=key;
+      pb.addEventListener("click",function(){
+        state.colors[key]=p>>>0; syncColorRow(key);
+      });
+      pr.appendChild(pb);
+    });
+    det.appendChild(pr); row.appendChild(det);
+    host.appendChild(row);
+  });
+  syncAllColorRows();
+}
+function syncColorRow(key, skipHex){
+  var v=state.colors[key]>>>0;
+  $("sw-"+key).style.background=css(v);
+  $("pick-"+key).value=cssOpaque(v);
+  $("alpha-"+key).value=String((v>>>24)&255);
+  if(!skipHex) $("hex-"+key).value=toHex8(v);
+  var btns=document.querySelectorAll('button[data-key="'+key+'"]');
+  for(var i=0;i<btns.length;i++){
+    if(btns[i].dataset.preset===toHex8(v)) btns[i].classList.add("sel");
+    else btns[i].classList.remove("sel");
+  }
+  refreshPreview();
+}
+function syncAllColorRows(){
+  COLOR_KEYS.forEach(function(pair){ syncColorRow(pair[0]); });
+  refreshPreview();
+}
+
+/* ===== Efeitos: monta as 5 fileiras ===== */
+var sfxAudio={};
+function buildSfx(){
+  var host=$("sfx"); host.innerHTML="";
+  SFX_SLOTS.forEach(function(pair){
+    var slot=pair[0], label=t(pair[1]);
+    var row=document.createElement("div"); row.className="mediarow";
+    var info=document.createElement("div"); info.className="info";
+    var b=document.createElement("b"); b.textContent=label;
+    var sp=document.createElement("span"); sp.id="sfxname-"+slot; sp.textContent=t("app_default");
+    info.appendChild(b); info.appendChild(sp);
+    var play=document.createElement("button"); play.className="mini"; play.textContent="▶";
+    play.id="sfxplay-"+slot; play.disabled=true;
+    play.addEventListener("click",function(){
+      var s=state.sounds[slot]; if(!s) return;
+      if(!sfxAudio[slot]) sfxAudio[slot]=new Audio();
+      sfxAudio[slot].src=s.url; sfxAudio[slot].play();
+    });
+    var lab=document.createElement("label"); lab.className="btn mini"; lab.textContent=t("choose");
+    lab.setAttribute("for","sfxfile-"+slot);
+    var inp=document.createElement("input"); inp.type="file"; inp.id="sfxfile-"+slot;
+    inp.accept="audio/*";
+    inp.addEventListener("change",function(){ onAudioFile(inp.files[0],slot); inp.value=""; });
+    var clr=document.createElement("button"); clr.className="mini"; clr.textContent=t("app_default");
+    clr.id="sfxclear-"+slot; clr.disabled=true;
+    clr.addEventListener("click",function(){ setSfx(slot,null); });
+    row.appendChild(info); row.appendChild(play); row.appendChild(lab);
+    row.appendChild(inp); row.appendChild(clr);
+    host.appendChild(row);
+  });
+}
+function setSfx(slot, entry){
+  if(state.sounds[slot] && state.sounds[slot].url) URL.revokeObjectURL(state.sounds[slot].url);
+  if(entry) state.sounds[slot]=entry; else delete state.sounds[slot];
+  $("sfxname-"+slot).textContent=entry? entry.name : t("app_default");
+  $("sfxplay-"+slot).disabled=!entry;
+  $("sfxclear-"+slot).disabled=!entry;
+}
+
+/* ===== Skins do controle (espelho de PadSkin.kt) ===== */
+var PAD_IDS=[
+  ["a","pad_a","A"],["b","pad_b","B"],["x","pad_x","X"],["y","pad_y","Y"],
+  ["up","pad_up","▲"],["down","pad_down","▼"],["left","pad_left","◀"],["right","pad_right","▶"],
+  ["l1","pad_l1","L1"],["r1","pad_r1","R1"]
+];
+var PAD_SHAPES=[
+  ["circle","shape_circle"],["square","shape_square"],["triangle","shape_triangle"],
+  ["diamond","shape_diamond"],["star","shape_star"]
+];
+var PAD_GLYPH_COLORS={a:"#9BE27A",b:"#FF7A7A",x:"#6BB8FF",y:"#FFD54F"};
+var padState={}; // id -> {mode,shape,color,label,image:{name,ext,data,url}|null}
+function padDefault(){ return {mode:"auto",shape:"circle",color:0xFFFFFFFF,label:true,image:null}; }
+function starPoints(cx,cy,R,r){
+  var pts=[];
+  for(var i=0;i<10;i++){
+    var a=-Math.PI/2+i*Math.PI/5, rad=(i%2===0)?R:r;
+    pts.push((cx+rad*Math.cos(a)).toFixed(1)+","+(cy+rad*Math.sin(a)).toFixed(1));
+  }
+  return pts.join(" ");
+}
+function svgShape(shape,color){
+  var inner="";
+  if(shape==="square") inner='<rect x="7" y="7" width="42" height="42" rx="8" fill="'+color+'"/>';
+  else if(shape==="triangle") inner='<polygon points="28,7 50,49 6,49" fill="'+color+'"/>';
+  else if(shape==="diamond") inner='<polygon points="28,5 50,28 28,51 6,28" fill="'+color+'"/>';
+  else if(shape==="star") inner='<polygon points="'+starPoints(28,28,23,10.5)+'" fill="'+color+'"/>';
+  else inner='<circle cx="28" cy="28" r="23" fill="'+color+'"/>';
+  return '<svg viewBox="0 0 56 56" width="48" height="48">'+inner+
+    '<ellipse cx="21" cy="20" rx="11" ry="8" fill="#fff" opacity="0.22"/></svg>';
+}
+function glyphOf(id){
+  for(var i=0;i<PAD_IDS.length;i++) if(PAD_IDS[i][0]===id) return PAD_IDS[i][2];
+  return "?";
+}
+function updatePadCount(){
+  var n=0, id;
+  for(id in padState){ if(padState[id]&&padState[id].mode!=="auto") n++; }
+  var el=$("padcount");
+  if(el) el.textContent=n===0? t("padcount_none")
+    : t("padcount_some",{n:n});
+}
+function refreshPadPreview(id){
+  updatePadCount();
+  var st=padState[id]||padDefault(), host=$("padprev-"+id);
+  if(!host) return;
+  if(st.mode==="image"&&st.image){
+    host.innerHTML='<img src="'+st.image.url+'" alt="">';
+  }else if(st.mode==="shape"){
+    host.innerHTML=svgShape(st.shape,css(st.color))+
+      (st.label? '<span class="plabel">'+glyphOf(id)+'</span>' : '');
+  }else{
+    var gc=PAD_GLYPH_COLORS[id]||"#fff";
+    host.innerHTML='<span class="pglyph" style="color:'+gc+'">'+glyphOf(id)+'</span>';
+  }
+}
+function buildPadButtons(){
+  var host=$("padbuttons"); host.innerHTML="";
+  PAD_IDS.forEach(function trio(pair){
+    var id=pair[0], label=t(pair[1]);
+    if(!padState[id]) padState[id]=padDefault();
+    var st=padState[id];
+    var row=document.createElement("div"); row.className="padrow";
+    var html='<div class="top"><div class="padprev" id="padprev-'+id+'"></div><b>'+label+'</b></div>'+
+      '<div class="modes">'+
+      '<button class="mini" data-padmode="auto" data-id="'+id+'">'+t("mode_default")+'</button>'+
+      '<button class="mini" data-padmode="shape" data-id="'+id+'">'+t("mode_shape")+'</button>'+
+      '<button class="mini" data-padmode="image" data-id="'+id+'">'+t("mode_image")+'</button>'+
+      '</div><div class="padbody" id="padbody-'+id+'"></div>';
+    row.innerHTML=html;
+    host.appendChild(row);
+    syncPadBody(id);
+    refreshPadPreview(id);
+  });
+  host.onclick=function(e){
+    var b=e.target.closest("button"); if(!b) return;
+    var id=b.dataset.id; if(!id||!padState[id]) return;
+    if(b.dataset.padmode){ padState[id].mode=b.dataset.padmode; syncPadBody(id); refreshPadPreview(id); }
+    else if(b.dataset.padshape){ padState[id].shape=b.dataset.padshape; syncPadBody(id); refreshPadPreview(id); }
+    else if(b.dataset.padpreset){ padState[id].color=parseInt(b.dataset.padpreset,16)>>>0; syncPadBody(id); refreshPadPreview(id); }
+    else if(b.dataset.padpick){ var inp=$("padfile-"+id); if(inp) inp.click(); }
+    else if(b.dataset.padclear){ setPadImage(id,null); syncPadBody(id); refreshPadPreview(id); }
+  };
+}
+function syncPadBody(id){
+  var st=padState[id], body=$("padbody-"+id);
+  if(!st||!body) return;
+  var btns=body.parentNode.querySelectorAll('button[data-padmode][data-id="'+id+'"]');
+  for(var i=0;i<btns.length;i++){
+    if(btns[i].dataset.padmode===st.mode) btns[i].classList.add("on");
+    else btns[i].classList.remove("on");
+  }
+  var h="";
+  if(st.mode==="shape"){
+    h+='<div class="shapes">';
+    PAD_SHAPES.forEach(function(pair){
+      h+='<button class="mini'+(st.shape===pair[0]?' on':'')+'" data-padshape="'+pair[0]+'" data-id="'+id+'">'+t(pair[1])+'</button>';
+    });
+    h+='</div><div class="crow">'+
+      '<input type="color" id="padpick-'+id+'" value="'+cssOpaque(st.color)+'">'+
+      '<input type="range" id="padalpha-'+id+'" min="0" max="255" value="'+((st.color>>>24)&255)+'">'+
+      '<input type="text" id="padhex-'+id+'" value="'+toHex8(st.color)+'" maxlength="8" spellcheck="false">'+
+      '</div><label class="chk"><input type="checkbox" id="padlabel-'+id+'"'+(st.label?' checked':'')+'> '+t("show_letter")+'</label>';
+  }else if(st.mode==="image"){
+    h+='<div class="crow"><span style="font-size:13px;color:var(--sub)">'+
+      (st.image? st.image.name : t("no_image_yet"))+
+      '</span></div><div class="crow">'+
+      '<button class="mini" data-padpick="1" data-id="'+id+'">'+t("choose_image")+'</button>'+
+      (st.image? '<button class="mini" data-padclear="1" data-id="'+id+'">'+t("mode_default")+'</button>' : '')+
+      '</div><input type="file" id="padfile-'+id+'" accept="image/*">';
+  }
+  body.innerHTML=h;
+  if(st.mode==="shape"){
+    $("padpick-"+id).addEventListener("input",function(e){
+      var rgb=parseInt(e.target.value.slice(1),16);
+      st.color=((((st.color>>>24)&255)<<24)|rgb)>>>0;
+      refreshPadPreview(id);
+      var hx=$("padhex-"+id); if(hx) hx.value=toHex8(st.color);
+    });
+    $("padalpha-"+id).addEventListener("input",function(e){
+      st.color=(( (+e.target.value)<<24)|(st.color&0xFFFFFF))>>>0;
+      refreshPadPreview(id);
+      var hx=$("padhex-"+id); if(hx) hx.value=toHex8(st.color);
+    });
+    $("padhex-"+id).addEventListener("input",function(e){
+      var clean=e.target.value.toUpperCase().replace(/[^0-9A-F]/g,"").slice(0,8);
+      if(clean!==e.target.value) e.target.value=clean;
+      var v=parseHex(clean);
+      if(v!==null){ st.color=v; refreshPadPreview(id); }
+    });
+    $("padlabel-"+id).addEventListener("change",function(e){
+      st.label=e.target.checked; refreshPadPreview(id);
+    });
+  }else if(st.mode==="image"){
+    var inp=$("padfile-"+id);
+    if(inp) inp.addEventListener("change",function(e){
+      readFile(e.target.files[0],["png","jpg","jpeg","webp","gif","bmp"]).then(function(entry){
+        if(entry) setPadImage(id,entry);
+        syncPadBody(id); refreshPadPreview(id);
+      });
+      e.target.value="";
+    });
+  }
+}
+function setPadImage(id, entry){
+  var st=padState[id]; if(!st) return;
+  if(st.image&&st.image.url) URL.revokeObjectURL(st.image.url);
+  st.image=entry;
+}
+
+/* ===== Arquivos ===== */
+function readFile(file, okExts){
+  return new Promise(function(resolve){
+    if(!file){ resolve(null); return; }
+    var ext=extOf(file.name);
+    if(okExts.indexOf(ext)<0){
+      alert(t("alert_format",{f:(file.name||"arquivo"),exts:okExts.join(", ")}));
+      resolve(null); return;
+    }
+    var r=new FileReader();
+    r.onload=function(){ resolve({name:file.name, ext:ext, data:new Uint8Array(r.result), url:URL.createObjectURL(file)}); };
+    r.onerror=function(){ resolve(null); };
+    r.readAsArrayBuffer(file);
+  });
+}
+function onAudioFile(file, slot){
+  readFile(file, AUDIO_EXTS).then(function(entry){
+    if(!entry) return;
+    if(slot==="music"){
+      if(state.music && state.music.url) URL.revokeObjectURL(state.music.url);
+      state.music=entry;
+      $("musicname").textContent=entry.name;
+      var prev=$("musicprev"); prev.src=entry.url; prev.style.display="block";
+      $("musicclear").disabled=false;
+    }else{
+      setSfx(slot,entry);
+    }
+  });
+}
+
+/* ===== Exportar / importar zip ===== */
+function zipNameFor(kind, ext){ return kind+"."+ext; }
+function collectFiles(){
+  var files={};
+  if(state.bg){ files[zipNameFor("bg",state.bg.ext)]=state.bg.data; }
+  if(state.music){ files[zipNameFor("music",state.music.ext)]=state.music.data; }
+  var sounds={};
+  SFX_SLOTS.forEach(function(pair){
+    var s=state.sounds[pair[0]];
+    if(s){ var n=zipNameFor(pair[0],s.ext); files[n]=s.data; sounds[pair[0]]=n; }
+  });
+  // Skins do controle: monta do padState (editável na seção Controles).
+  // Formato = o do app (PadSkin.toJson): botões direto na raiz do "pad",
+  // SEM embrulho "buttons" (foi esse embrulho que zerava as skins no app).
+  var padButtons={}, hasPad=false;
+  Object.keys(padState).forEach(function(id){
+    var st=padState[id];
+    if(!st||st.mode==="auto") return;
+    hasPad=true;
+    var entry={mode:st.mode, shape:st.shape, color:st.color>>>0, label:!!st.label, image:null};
+    if(st.mode==="image"&&st.image){
+      var n="pad_"+id+"."+st.image.ext;
+      files[n]=st.image.data;
+      entry.image=n;
+    }
+    padButtons[id]=entry;
+  });
+  var manifest={
+    id:"web-"+Date.now().toString(36),
+    name:(state.name||"").trim()||t("untitled"),
+    colors:Object.assign({},state.colors),
+    backgroundImage:state.bg? zipNameFor("bg",state.bg.ext) : null,
+    backgroundFit:(state.bgFit==="fit")? "fit" : "crop",
+    music:state.music? zipNameFor("music",state.music.ext) : null,
+    sounds:sounds,
+    pad:hasPad? padButtons : null
+  };
+  return {files:files, manifest:manifest};
+}
+/* ===== Zip em JS puro (sem dependências) =====
+ * Exportação: entradas STORED (sem compressão — imagem/áudio já são
+ * comprimidos e o JSON é minúsculo). Importação: lê STORED direto e
+ * infla DEFLATED com a DecompressionStream nativa (zips vindos do app).
+ */
+var CRC_TABLE=(function(){
+  var t=new Uint32Array(256), c, k, n;
+  for(n=0;n<256;n++){ c=n; for(k=0;k<8;k++) c=(c&1)? (0xEDB88320^(c>>>1)) : (c>>>1); t[n]=c>>>0; }
+  return t;
+})();
+function crc32(u8){
+  var c=0xFFFFFFFF, i;
+  for(i=0;i<u8.length;i++) c=CRC_TABLE[(c^u8[i])&255]^(c>>>8);
+  return (c^0xFFFFFFFF)>>>0;
+}
+var TE=new TextEncoder(), TD=new TextDecoder();
+function createStoredZip(namedFiles){
+  // namedFiles: [[nome, Uint8Array]] — monta local headers + central dir.
+  var names=Object.keys(namedFiles);
+  var enc=names.map(function(n){ return {name:n, raw:TE.encode(n), data:namedFiles[n]}; });
+  var dirSize=0, dataSize=0, i;
+  for(i=0;i<enc.length;i++) dirSize+=46+enc[i].raw.length;
+  for(i=0;i<enc.length;i++) dataSize+=30+enc[i].raw.length+enc[i].data.length;
+  var total=dataSize+dirSize+22;
+  var buf=new ArrayBuffer(total), v=new DataView(buf), u8=new Uint8Array(buf);
+  var p=0, cdStart=0;
+  var DOS_TIME=(12<<11)|(0<<5)|0, DOS_DATE=((2026-1980)<<9)|(9<<5)|24; // fixo, só metadado
+  for(i=0;i<enc.length;i++){
+    var e=enc[i], crc=crc32(e.data);
+    if(i===0) cdStart=p;
+    v.setUint32(p,0x04034b50,true); v.setUint16(p+4,20,true);
+    v.setUint16(p+6,0x0800,true); v.setUint16(p+8,0,true); // UTF-8, STORED
+    v.setUint16(p+10,DOS_TIME,true); v.setUint16(p+12,DOS_DATE,true);
+    v.setUint32(p+14,crc,true);
+    v.setUint32(p+18,e.data.length,true); v.setUint32(p+22,e.data.length,true);
+    v.setUint16(p+26,e.raw.length,true); v.setUint16(p+28,0,true);
+    u8.set(e.raw,p+30); u8.set(e.data,p+30+e.raw.length);
+    e.localOffset=p; e.crc=crc;
+    p+=30+e.raw.length+e.data.length;
+  }
+  var cdOff=p;
+  for(i=0;i<enc.length;i++){
+    var f=enc[i];
+    v.setUint32(p,0x02014b50,true);
+    v.setUint16(p+4,0x031E,true); v.setUint16(p+6,20,true);
+    v.setUint16(p+8,0x0800,true); v.setUint16(p+10,0,true);
+    v.setUint16(p+12,DOS_TIME,true); v.setUint16(p+14,DOS_DATE,true);
+    v.setUint32(p+16,f.crc,true);
+    v.setUint32(p+20,f.data.length,true); v.setUint32(p+24,f.data.length,true);
+    v.setUint16(p+28,f.raw.length,true);
+    v.setUint16(p+30,0,true); v.setUint16(p+32,0,true);
+    v.setUint16(p+34,0,true); v.setUint16(p+36,0,true);
+    v.setUint32(p+38,0,true); v.setUint32(p+42,f.localOffset,true);
+    u8.set(f.raw,p+46);
+    p+=46+f.raw.length;
+  }
+  var cdLen=p-cdOff;
+  v.setUint32(p,0x06054b50,true);
+  v.setUint16(p+8,enc.length,true); v.setUint16(p+10,enc.length,true);
+  v.setUint32(p+12,cdLen,true); v.setUint32(p+16,cdOff,true);
+  v.setUint16(p+20,0,true);
+  return u8;
+}
+function parseZipEntries(u8){
+  // Acha o EOCD (última ocorrência nos 64KB finais) e lista o central dir.
+  var start=Math.max(0,u8.length-65558), eocd=-1, i;
+  var v=new DataView(u8.buffer,u8.byteOffset,u8.byteLength);
+  for(i=u8.length-22;i>=start;i--){
+    if(v.getUint32(i,true)===0x06054b50){ eocd=i; break; }
+  }
+  if(eocd<0) return null;
+  var count=v.getUint16(eocd+10,true), cdOff=v.getUint32(eocd+16,true);
+  var out=[], p=cdOff;
+  for(i=0;i<count;i++){
+    if(v.getUint32(p,true)!==0x02014b50) return null;
+    var method=v.getUint16(p+10,true);
+    var csize=v.getUint32(p+20,true);
+    var nlen=v.getUint16(p+28,true), elen=v.getUint16(p+30,true), clen=v.getUint16(p+32,true);
+    var loff=v.getUint32(p+42,true);
+    var name=TD.decode(u8.subarray(p+46,p+46+nlen));
+    out.push({name:name, method:method, csize:csize, localOffset:loff});
+    p+=46+nlen+elen+clen;
+  }
+  return {entries:out, view:v, bytes:u8};
+}
+function zipEntryData(parsed, entry){
+  var v=parsed.view, u8=parsed.bytes, lo=entry.localOffset;
+  if(v.getUint32(lo,true)!==0x04034b50) return Promise.reject(new Error("bad local"));
+  var nlen=v.getUint16(lo+26,true), elen=v.getUint16(lo+28,true);
+  var data=u8.subarray(lo+30+nlen+elen, lo+30+nlen+elen+entry.csize);
+  if(entry.method===0) return Promise.resolve(data);
+  if(entry.method===8 && typeof DecompressionStream!=="undefined"){
+    var ds=new DecompressionStream("deflate-raw");
+    var stream=new Blob([data]).stream().pipeThrough(ds);
+    return new Response(stream).arrayBuffer().then(function(ab){ return new Uint8Array(ab); });
+  }
+  return Promise.reject(new Error("no inflate"));
+}
+function doExport(){
+  var packed=collectFiles();
+  var zipdata=Object.assign({},packed.files);
+  zipdata["theme.json"]=TE.encode(JSON.stringify(packed.manifest,null,2));
+  var zipped;
+  try{ zipped=createStoredZip(zipdata); }
+  catch(e){ alert(t("alert_export_fail")); return; }
+  var safe=(state.name||t("untitled")).replace(/[^\wÀ-ÿ \-]+/g,"").trim().slice(0,40)||"tema";
+  var blob=new Blob([zipped],{type:"application/zip"});
+  var a=document.createElement("a");
+  a.href=URL.createObjectURL(blob);
+  a.download=safe+".aerotheme.zip";
+  document.body.appendChild(a); a.click();
+  setTimeout(function(){ URL.revokeObjectURL(a.href); a.remove(); },4000);
+}
+function doImport(file){
+  if(!file) return;
+  var r=new FileReader();
+  r.onload=function(){
+    try{
+      var bytes=new Uint8Array(r.result);
+      if(bytes.length>100*1024*1024){ alert(t("alert_too_big")); return; }
+      var parsed=parseZipEntries(bytes);
+      if(!parsed){ alert(t("alert_not_zip")); return; }
+      var mentry=null, i;
+      for(i=0;i<parsed.entries.length;i++){
+        if(parsed.entries[i].name==="theme.json"){ mentry=parsed.entries[i]; break; }
+      }
+      if(!mentry){ alert(t("alert_no_manifest")); return; }
+      zipEntryData(parsed,mentry).then(function(raw){
+        var manifest;
+        try{ manifest=JSON.parse(TD.decode(raw)); }
+        catch(e){ alert(t("alert_bad_manifest")); return; }
+        if(!manifest || typeof manifest!=="object" || !manifest.colors){ alert(t("alert_bad_manifest")); return; }
+        // Baixa as mídias referenciadas (ignora o resto do zip).
+        var wanted={};
+        if(typeof manifest.backgroundImage==="string"&&manifest.backgroundImage) wanted[manifest.backgroundImage]="backgroundImage";
+        if(typeof manifest.music==="string"&&manifest.music) wanted[manifest.music]="music";
+        if(manifest.sounds&&typeof manifest.sounds==="object"){
+          for(var k in manifest.sounds){
+            if(typeof manifest.sounds[k]==="string"&&manifest.sounds[k]) wanted[manifest.sounds[k]]="s:"+k;
+          }
+        }
+        // Skins do controle: aceita os dois formatos (flat do app e o
+        // embrulho "buttons" que o site gerou por um tempo — nunca perdemos).
+        var padBtns=null;
+        if(manifest.pad&&typeof manifest.pad==="object"){
+          padBtns=(manifest.pad.buttons&&typeof manifest.pad.buttons==="object")?
+            manifest.pad.buttons : manifest.pad;
+        }
+        var padWanted=[];
+        if(padBtns){
+          for(var b in padBtns){
+            var sk=padBtns[b];
+            if(sk&&typeof sk.image==="string"&&sk.image) padWanted.push(sk.image);
+          }
+        }
+        var unzipped={}, jobs=[];
+        parsed.entries.forEach(function(e){
+          if(!wanted[e.name]||e.csize>50*1024*1024) return;
+          jobs.push(zipEntryData(parsed,e).then(function(d){ unzipped[e.name]=d; },function(){ /* mídia ruim: segue sem ela */ }));
+        });
+        padWanted.forEach(function(n){
+          var found=null, i;
+          for(i=0;i<parsed.entries.length;i++){ if(parsed.entries[i].name===n){ found=parsed.entries[i]; break; } }
+          if(!found||found.csize>10*1024*1024) return;
+          jobs.push(zipEntryData(parsed,found).then(function(d){ unzipped[n]=d; },function(){}));
+        });
+        Promise.all(jobs).then(function(){ applyManifest(manifest,unzipped); });
+      },function(){ alert(t("alert_bad_zip")); });
+    }catch(e){ alert(t("alert_bad_zip")); }
+  };
+  r.readAsArrayBuffer(file);
+}
+function mimeFor(ext){
+  if(IMAGE_EXTS.indexOf(ext)>=0) return "image/"+(ext==="jpg"?"jpeg":ext);
+  if(ext==="mp3") return "audio/mpeg";
+  if(ext==="mid"||ext==="midi") return "audio/midi";
+  if(ext==="mov") return "video/quicktime";
+  if(ext==="mkv") return "video/x-matroska";
+  if(isVideoExt(ext)) return "video/"+ext;
+  return "audio/"+ext;
+}
+function applyManifest(m, unzipped){
+  state.name=String(m.name||t("untitled")).slice(0,40);
+  $("themename").value=state.name;
+  Object.keys(DEFAULTS).forEach(function(k){
+    var v=m.colors[k];
+    state.colors[k]=(typeof v==="number" && isFinite(v))? v>>>0 : DEFAULTS[k];
+  });
+  function take(key){
+    var name=m[key];
+    if(typeof name!=="string"||!name||!unzipped[name]) return null;
+    var ext=extOf(name);
+    var blob=new Blob([unzipped[name]],{type:mimeFor(ext)});
+    return {name:name, ext:ext, data:unzipped[name], url:URL.createObjectURL(blob)};
+  }
+  if(state.bg&&state.bg.url) URL.revokeObjectURL(state.bg.url);
+  state.bg=take("backgroundImage");
+  state.bgFit=(m.backgroundFit==="fit")? "fit" : "crop";
+  syncBgFitButtons();
+  var bgIsVid=state.bg&&isVideoExt(state.bg.ext);
+  $("bgthumb").style.display=(state.bg&&!bgIsVid)?"block":"none";
+  if(state.bg&&!bgIsVid) $("bgthumb").src=state.bg.url;
+  $("bgname").textContent=state.bg? state.bg.name : t("app_default");
+  $("bgclear").disabled=!state.bg;
+  if(state.music&&state.music.url) URL.revokeObjectURL(state.music.url);
+  state.music=take("music");
+  $("musicname").textContent=state.music? state.music.name : t("app_default");
+  var prev=$("musicprev");
+  if(state.music){ prev.src=state.music.url; prev.style.display="block"; }
+  else{ prev.removeAttribute("src"); prev.style.display="none"; }
+  $("musicclear").disabled=!state.music;
+  var sm=(m.sounds&&typeof m.sounds==="object")? m.sounds : {};
+  SFX_SLOTS.forEach(function(pair){
+    var raw=sm[pair[0]];
+    if(typeof raw==="string"&&raw&&unzipped[raw]){
+      var ext=extOf(raw);
+      var blob=new Blob([unzipped[raw]],{type:mimeFor(ext)});
+      setSfx(pair[0],{name:raw, ext:ext, data:unzipped[raw], url:URL.createObjectURL(blob)});
+    }else{
+      setSfx(pair[0],null);
+    }
+  });
+  // Skins do controle: popula o padState editável (preserva o importado).
+  // Aceita flat (app) ou embrulho "buttons" (site antigo).
+  Object.keys(padState).forEach(function(id){
+    var old=padState[id];
+    if(old&&old.image&&old.image.url) URL.revokeObjectURL(old.image.url);
+  });
+  padState={};
+  function validShape(s){ return (s==="square"||s==="triangle"||s==="diamond"||s==="star")? s : "circle"; }
+  var btnSrc=null;
+  if(m.pad&&typeof m.pad==="object"){
+    btnSrc=(m.pad.buttons&&typeof m.pad.buttons==="object")? m.pad.buttons : m.pad;
+  }
+  if(btnSrc){
+    Object.keys(btnSrc).forEach(function(id){
+      var known=false, i;
+      for(i=0;i<PAD_IDS.length;i++){ if(PAD_IDS[i][0]===id){ known=true; break; } }
+      if(!known) return;
+      var s=btnSrc[id]||{};
+      var entry={
+        mode:(s.mode==="shape"||s.mode==="image")? s.mode : "auto",
+        shape:validShape(s.shape),
+        color:(typeof s.color==="number"&&isFinite(s.color))? s.color>>>0 : 0xFFFFFFFF,
+        label:s.label!==false,
+        image:null
+      };
+      if(entry.mode==="image"&&typeof s.image==="string"&&s.image&&unzipped[s.image]){
+        var ext=extOf(s.image);
+        var blob=new Blob([unzipped[s.image]],{type:mimeFor(ext)});
+        entry.image={name:s.image, ext:ext, data:unzipped[s.image], url:URL.createObjectURL(blob)};
+      }
+      padState[id]=entry;
+    });
+  }
+  buildPadButtons();
+  syncAllColorRows();
+}
+
+/* ===== Liga tudo ===== */
+window.addEventListener("DOMContentLoaded",function(){
+  var detected=detectLang();
+  var btns=document.querySelectorAll("#langsw .langbtn");
+  for(var b=0;b<btns.length;b++){
+    (function(btn){
+      btn.addEventListener("click",function(){ applyLang(btn.dataset.lang); });
+    })(btns[b]);
+  }
+  applyLang(detected);
+  $("padreset").addEventListener("click",function(){
+    Object.keys(padState).forEach(function(id){
+      var st=padState[id];
+      if(st&&st.image&&st.image.url) URL.revokeObjectURL(st.image.url);
+    });
+    padState={};
+    buildPadButtons();
+  });
+  if(typeof DecompressionStream==="undefined"){
+    $("libwarn").style.display="block";
+  }
+  $("themename").addEventListener("input",function(e){
+    state.name=e.target.value; refreshPreview();
+  });
+  $("bgfile").addEventListener("change",function(e){
+    readFile(e.target.files[0],BG_EXTS).then(function(entry){
+      if(!entry) return;
+      if(state.bg&&state.bg.url) URL.revokeObjectURL(state.bg.url);
+      state.bg=entry;
+      if(isVideoExt(entry.ext)){ $("bgthumb").style.display="none"; }
+      else{ $("bgthumb").src=entry.url; $("bgthumb").style.display="block"; }
+      $("bgname").textContent=entry.name;
+      $("bgclear").disabled=false;
+      syncBgFitButtons();
+    });
+    e.target.value="";
+  });
+  $("bgfitcrop").addEventListener("click",function(){ state.bgFit="crop"; syncBgFitButtons(); });
+  $("bgfitfit").addEventListener("click",function(){ state.bgFit="fit"; syncBgFitButtons(); });
+  $("bgclear").addEventListener("click",function(){
+    if(state.bg&&state.bg.url) URL.revokeObjectURL(state.bg.url);
+    state.bg=null;
+    state.bgFit="crop";
+    $("bgthumb").style.display="none";
+    $("bgname").textContent=t("app_default");
+    $("bgclear").disabled=true;
+    syncBgFitButtons();
+  });
+  $("musicfile").addEventListener("change",function(e){
+    onAudioFile(e.target.files[0],"music"); e.target.value="";
+  });
+  $("musicclear").addEventListener("click",function(){
+    if(state.music&&state.music.url) URL.revokeObjectURL(state.music.url);
+    state.music=null;
+    $("musicname").textContent=t("app_default");
+    var prev=$("musicprev"); prev.removeAttribute("src"); prev.style.display="none";
+    $("musicclear").disabled=true;
+  });
+  $("exportbtn").addEventListener("click",doExport);
+  $("importzip").addEventListener("change",function(e){
+    doImport(e.target.files[0]); e.target.value="";
+  });
+});
+</script>
+</body>
+</html>
