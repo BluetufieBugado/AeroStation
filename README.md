@@ -3,13 +3,28 @@
 <img src="icon-src/icon-full.png" alt="Banner" width="200">
 
 Um aplicativo que organiza suas ROMs com estética inspirada em Frutiger Aero e XMB com um toque de menu do Nintendo Switch.
-[apoie este projeto!](http://livepix.gg/bluetufiebugado)
+[apoie este projeto e me motive a continuar =D!](http://livepix.gg/bluetufiebugado)
 
-## Estado atual do projeto
+[you can support this project here with ko-fi =)](https://ko-fi.com/bluetufiebugado)
 
-Atualmente o projeto conta com funções avançadas como contador de horas com um marcador de ultima conquista desbloqueada, página dedicada de conquistas em jogos, página com carrocel de apps, possibilidade de navegar entre os jogos com controle fisico ou digital, adicionar jogos android e recompilações a tela inicial, galeria de capturas de tela e gravação de video, dentre outros.
+## Utilização
 
-Os emuladores suportados e testados incluem:
+[apresentação completa do aplicativo](https://www.youtube.com/watch?v=UfPRk3v5Qo0&t=6s)
+
+<img width="720" alt="default-theme" src="https://github.com/user-attachments/assets/a968d831-27ae-48ac-a071-18a81d844ab6" />
+
+Ao abrir o App pela primeira vez clique no ícone de adicionar jogos (+) e em seguida escolha a pasta onde você guardou e organizou seus jogos, é recomendavel que eles estejam separados por pastas, dessa forma:
+
+| Pastas       | Jogos           |
+| -------------- | ------------------------ |
+| GBA | Sonic Advance, Zelda Minish Cap, Super Mario Advance [...] |
+| PS1 | Resident Evil 2, Crash Bandicoot [...]|
+| PS2 | Dragon Ball Z Budokai Tenkaichi 3, Resident Evil 4, God of War [...]|
+
+Se clicar e segurar novamente no botão (🔃 ele permite escolher outra pasta. Ao lado desse botão você pode escolher uma foto de perfil, e se quiser pode também conectar sua conta do retroachievements nas configurações e ela aparecerá nesse espaço da tela.
+Toque e segure sobre um jogo e você verá várias opções de customização, incluindo buscar imagens daquele jogo no SteamGridDB.
+
+## Emuladores Suportados e Testados
 
 | Plataforma       | Emulador            |
 | -------------- | ------------------------ |
@@ -28,56 +43,40 @@ Os emuladores suportados e testados incluem:
 | Switch | Eden e Skyline Edge |
 | Gamecube | Dolphin e Dolphin MMJR2|
 | Wii | Dolphin e Dolphin MMJR2|
-| Wii U | Ainda não testado |
+| Wii U | Suportado com Cemu Android! |
 | PSP | PPSSPP (O GOAT) |
 | PS1 | Duckstation |
 | PS2 | AetherSX2/NetherSX2 |
-| PS3 | Não testado |
+| PS3 | Planejado para o futuro! |
 | PSVita | Vita3K Plus |
 | DreamCast| Redream e Flycast |
 | Java ME | J2ME Loader |
-| Xbox Classico | Não testado |
-| Xbox 360 e One | Não testado |
+| Xbox Classico | Em Breve |
+| Xbox 360 e One | Em Breve |
 
-## Notas e adições futuras
+## Temas!🎨
 
-Atualmente jogos de PS3 e Xbox One e 360 são os mais complicados para testar e implementar o boot corretamente, pois não tenho um dispositivo forte o suficiente para rodar jogos dessas duas plataformas de maneira satisfatória para teste. 
+Você pode criar e importar temas personalizados no aplicativo! basta acessar as configurações e procurar pela opção de temas, você poderá personalizar tudo que puder imaginar, deixe o app com o aspecto que você desejar! 
 
-Você deve estar se perguntando também do porque a escolha do NetherSX2 ao invés de ArmSX2, e a resposta é simples, atualmente o ArmSX2 não tem suporte a boot de jogos através de FrontEnds, por essa razão não consegui implementar esse suporte, caso no futuro ele venha a ser adicionado ficarei feliz em adicionar suporte a esse emulador no aplicativo.
+Se estiver no computador você também pode acessar uma versão web do criador de temas [aqui](!docs/index.html)
 
-O mesmo deve ser valido para o ArmSX3 que atualmente pode ser considerado o único emulador realmente promissor de PS3 que entrega um resultado interessante. (Sou leigo no assunto, então desculpem se falei besteira)
+# Previa de alguns temas:
+<img width="720" alt="playstation-theme" src="https://github.com/user-attachments/assets/3ec2a594-4f73-44ff-97cc-07a7a75d4d75" />
+Playstation 2
 
-O Cemu Android também será adicionado futuramente, junto do suporte a SegaCD e Sega Saturn.
+<img width="720" alt="xbox-theme" src="https://github.com/user-attachments/assets/b2d96763-5db8-4d9d-b07c-3a961581ddb1" />
+Xbox 360
 
-## Capturas de Tela e Gravações
-
-O app reconhece suas capturas de tela e gravações no momento em que você abre um jogo, rastreando o tempo em que você sai e volta para o aplicativo, o único poblema dessse sistema é que caso você esteja jogando, pause o jogo no meio do processo e abra uma conversa ou outro aplicativo fazendo uma captura de tela, o AeroStation pode reconhecer aquela captura de tela como parte do jogo. Isso não é algo que seja possivel de contornar.
-
-## Qual o intuito desse projeto a final?
-
-A ideia é trazer algo mais próximo de um console para dispositivos Android comuns, não é algo pensado para o AynTor, ou qualquer outro console portátil que use Android. Mas se você quiser usar em um portátil Android não há problema, penso em adicionar no futuro uma opção que permita adicionar o app como home menu do seu dispositivo, para ajudar nesses casos, já que atualmente ele funciona como launcher de jogos.
-
-Honestamente, eu o fiz por diversão e aprendizado, mas também queria criar um app que pudesse trazer um sentimento de console mesmo sem a necessidade de um controle fisico. Apps como o IISU podem até entregar uma interface bonita mas a navegação com sensação de console depende muito de um controle fisico. No geral esse problema seria resolvido com um controle digital como adicionei no meu proprio app, mas acredito que cada aplicativo ou projeto tem sua propria filosofia e é isso que importa.
-
-## Customizações
-
-Tenho muitas ideias de customizações no futuro e com certeza quero adicionar suporte a pacotes de temas que as proprias pessoas podem criar. Quero permitir que os usuarios mudem o fundo, os sons, o estilo dos controles, e talvez até o layout. Porém, isso vai demandar tempo e pensamento, preciso planejar como vou adicionar tantas customizações de uma vez, e de forma simples de se fazer, ninguém merece ficar horas na frente de um monte de linha de código quebrando a cabeça só para mudar a cor de um botão lol.
-
-## Esse projeto é AI Sloop?
-
-Definitivamente não, toda a ideia por trás do APP foi minha, porém, eu usei o OpenCode com o modelo Muze Spark 1.3 Zeen para acelerar e concertar erros irritantes de programação. Em outras palavras a IA foi uma ferramenta e não uma muleta. 
-
-Isso significa que eu não disse "faça um app assim" e ela mágicamente criou ele com tudo pronto. No total levou cerca de 2 semanas para chegar em um estado ideal com o projeto, de forma que ele funcionasse sem erros grotescos.
+<img width="720" alt="generations-theme" src="https://github.com/user-attachments/assets/35db9b1e-be3c-42fe-bc45-85827e05a882" />
+Sonic Generations
 
 ## Encontrei um erro, o que fazer?
-
 Se um emulador seu não abrir/executar um jogo você pode abrir um issue aqui e me dizer qual emulador você está tentando usar para executar um jogo, e a plataforma também que você quer jogar, com isso posso adicionar o nome de pacote do app na programação para tentar bootar os jogos nele. Existem emuladores que não conseguem abrir jogos assim, como o Armsx2 por exemplo, e se esse for o caso informarei como resposta essa limitação e o unico jeito é esperar que o desenvolvedor do app adicione suporte.
 
 Se o aplicativo crashar uma janela deve aparecer na sua tela falando que houve um crash e pedindo para você copiar ou compartilhar o log, nesse caso copie o log, abra um issue e diga o que aconteceu deixando o log para que eu possa analisar e concertar o problema. (Ou pelo menos tentar resolver)
 
 ## E jogos de PC? (Winlator/Gamehub/Gamenative/etc)
-
-Suporte experimental adicionado:
+Suporte experimental adicionado na V1.0:
 - **GameNative**: boot direto pelo ID da loja (action `app.gamenative.LAUNCH_GAME`, confirmada no fonte). Como ele não abre `.exe` por intent, mapeie o jogo uma vez (segurar > Definir ID da loja) com o AppID da Steam/Epic/GOG/Amazon — o jogo precisa estar instalado nele.
 - **Winlator e GameHub**: não têm API pública de boot externo (só a home é exportada), então o app abre a home deles pra você escolher o jogo lá dentro.
 
