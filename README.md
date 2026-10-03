@@ -58,7 +58,7 @@ Toque e segure sobre um jogo e você verá várias opções de customização, i
 
 Você pode criar e importar temas personalizados no aplicativo! basta acessar as configurações e procurar pela opção de temas, você poderá personalizar tudo que puder imaginar, deixe o app com o aspecto que você desejar! 
 
-Se estiver no computador você também pode acessar uma versão web do criador de temas [aqui](!docs/index.html)
+Se estiver no computador você também pode acessar uma versão web do criador de temas [aqui](https://bluetufiebugado.github.io/AeroStation/)
 
 # Previa de alguns temas:
 <img width="720" alt="playstation-theme" src="https://github.com/user-attachments/assets/3ec2a594-4f73-44ff-97cc-07a7a75d4d75" />
